@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
-  <schema id="io.github.weversonl.GnomeQS"
-          path="/io/github/weversonl/GnomeQS/">
+  <schema id="io.github.weversonl.GnomeQuickShare"
+          path="/io/github/weversonl/GnomeQuickShare/">
 
     <!-- Behavior -->
     <key name="autostart" type="b">

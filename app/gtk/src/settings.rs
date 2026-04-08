@@ -85,13 +85,13 @@ const AUTOSTART_CONTENT: &str = "[Desktop Entry]\n\
 Type=Application\n\
 Name=GnomeQS\n\
 Exec=gnomeqs\n\
-Icon=io.github.weversonl.GnomeQS\n\
+Icon=io.github.weversonl.GnomeQuickShare\n\
 Hidden=false\n\
 X-GNOME-Autostart-enabled=true\n";
 
 pub fn set_autostart(enable: bool) -> anyhow::Result<()> {
     let xdg = xdg::BaseDirectories::new()?;
-    let path = xdg.place_config_file("autostart/io.github.weversonl.GnomeQS.desktop")?;
+    let path = xdg.place_config_file("autostart/io.github.weversonl.GnomeQuickShare.desktop")?;
     if enable {
         std::fs::write(&path, AUTOSTART_CONTENT)?;
         log::debug!("Autostart enabled: {}", path.display());

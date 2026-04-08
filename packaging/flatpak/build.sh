@@ -2,11 +2,11 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-manifest="$root/packaging/flatpak/io.github.weversonl.GnomeQS.json"
+manifest="$root/packaging/flatpak/io.github.weversonl.GnomeQuickShare.json"
 vendor_dir="$root/packaging/flatpak/vendor"
 build_dir="$root/packaging/out/flatpak/build"
 repo_dir="$root/packaging/out/flatpak/repo"
-bundle="$root/packaging/out/flatpak/io.github.weversonl.GnomeQS.flatpak"
+bundle="$root/packaging/out/flatpak/io.github.weversonl.GnomeQuickShare.flatpak"
 
 rm -rf "$vendor_dir" "$build_dir" "$repo_dir" "$bundle"
 mkdir -p "$vendor_dir"
@@ -19,5 +19,5 @@ flatpak-builder \
   "$build_dir" \
   "$manifest"
 
-flatpak build-bundle "$repo_dir" "$bundle" io.github.weversonl.GnomeQS
+flatpak build-bundle "$repo_dir" "$bundle" io.github.weversonl.GnomeQuickShare
 echo "Built $bundle"

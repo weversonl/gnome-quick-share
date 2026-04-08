@@ -1,4 +1,4 @@
-pub const APP_ID: &str = "io.github.weversonl.GnomeQS";
+pub const APP_ID: &str = "io.github.weversonl.GnomeQuickShare";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const GETTEXT_PACKAGE: &str = "gnomeqs";
 

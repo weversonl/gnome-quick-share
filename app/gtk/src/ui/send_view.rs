@@ -68,7 +68,7 @@ impl SendView {
         files_group.set_margin_end(12);
         files_group.set_valign(gtk4::Align::Start);
 
-        let upload_icon = gtk4::Image::from_icon_name("io.github.weversonl.GnomeQS-airdrop-symbolic");
+        let upload_icon = gtk4::Image::from_icon_name("io.github.weversonl.GnomeQuickShare-airdrop-symbolic");
         upload_icon.add_css_class("send-drop-icon");
         upload_icon.set_halign(gtk4::Align::Center);
 

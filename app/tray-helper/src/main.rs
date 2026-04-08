@@ -10,7 +10,7 @@ const SOCKET_ENV: &str = "GNOMEQS_TRAY_SOCKET";
 const STATUS_ENV: &str = "GNOMEQS_TRAY_STATUS";
 const LANG_ENV: &str = "GNOMEQS_TRAY_LANG";
 const MONO_ENV: &str = "GNOMEQS_TRAY_MONO";
-const TRAY_ICON: &str = "io.github.weversonl.GnomeQS-airdrop-symbolic";
+const TRAY_ICON: &str = "io.github.weversonl.GnomeQuickShare-airdrop-symbolic";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Visibility {
@@ -30,7 +30,7 @@ fn main() -> anyhow::Result<()> {
     let icon_theme_path = icon_theme_root();
 
     let mut indicator =
-        AppIndicator::with_path("io.github.weversonl.GnomeQS", TRAY_ICON, &icon_theme_path);
+        AppIndicator::with_path("io.github.weversonl.GnomeQuickShare", TRAY_ICON, &icon_theme_path);
     indicator.set_title("GnomeQS");
     indicator.set_status(AppIndicatorStatus::Active);
     indicator.set_icon_theme_path(&icon_theme_path);

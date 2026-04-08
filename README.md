@@ -166,18 +166,18 @@ Build the Flatpak bundle:
 
 Output:
 
-- `packaging/out/flatpak/io.github.weversonl.GnomeQS.flatpak`
+- `packaging/out/flatpak/io.github.weversonl.GnomeQuickShare.flatpak`
 
 Install locally:
 
 ```bash
-flatpak install --user packaging/out/flatpak/io.github.weversonl.GnomeQS.flatpak
+flatpak install --user packaging/out/flatpak/io.github.weversonl.GnomeQuickShare.flatpak
 ```
 
 Run:
 
 ```bash
-flatpak run io.github.weversonl.GnomeQS
+flatpak run io.github.weversonl.GnomeQuickShare
 ```
 
 ### Arch Linux / PKGBUILD
