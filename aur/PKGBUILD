@@ -1,13 +1,11 @@
 # Maintainer: weversonl
 pkgname=gnomeqs
-provides=('rquickshare')
 pkgver=0.12.0
 pkgrel=1
 pkgdesc="GnomeQS - QuickShare client for GNOME"
 arch=('x86_64')
-url="https://github.com/weversonl/gnomeqs"
+url="https://github.com/weversonl/gnomeqs-gtk"
 license=('AGPL-3.0-only')
-_repo_root="/home/verso/Documentos/projetos/gnomegs-gtk"
 depends=(
   'gtk4'
   'gtk3'
@@ -27,12 +25,16 @@ source=()
 sha256sums=()
 
 build() {
+  local _repo_root
+  _repo_root="$(cd "${startdir:-$(pwd)}/.." && pwd)"
   cd "$_repo_root"
   export CARGO_TARGET_DIR="$srcdir/target"
   cargo build --release -p gnomeqs -p gnomeqs-tray
 }
 
 package() {
+  local _repo_root
+  _repo_root="$(cd "${startdir:-$(pwd)}/.." && pwd)"
   _bundledir="$srcdir/target/release"
   cd "$_repo_root"
 

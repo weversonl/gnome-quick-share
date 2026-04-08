@@ -10,7 +10,7 @@ const SOCKET_ENV: &str = "GNOMEQS_TRAY_SOCKET";
 const STATUS_ENV: &str = "GNOMEQS_TRAY_STATUS";
 const LANG_ENV: &str = "GNOMEQS_TRAY_LANG";
 const MONO_ENV: &str = "GNOMEQS_TRAY_MONO";
-const TRAY_ICON: &str = "io.github.weversonl.GnomeQS-tray-symbolic";
+const TRAY_ICON: &str = "io.github.weversonl.GnomeQS-airdrop-symbolic";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Visibility {

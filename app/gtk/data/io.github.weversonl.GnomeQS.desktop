@@ -7,6 +7,6 @@ Comment[pt_BR]=Compartilhe arquivos com dispositivos próximos
 Exec=gnomeqs
 Icon=io.github.weversonl.GnomeQS
 Categories=Network;FileTransfer;
-Keywords=share;nearby;file;transfer;
+Keywords=share;nearby;file;transfer;quickshare;
 StartupNotify=true
 StartupWMClass=GnomeQS
