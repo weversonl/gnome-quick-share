@@ -1,0 +1,15 @@
+target/
+*.snap
+gen
+.vscode/
+.claude/
+.codex/
+.codex
+.flatpak-builder/
+packaging/flatpak/vendor/
+packaging/out/
+aur/pkg/
+aur/src/
+aur/*.pkg.tar.zst
+aur/*.pkg.tar.zst.sig
+aur/*.tar.gz

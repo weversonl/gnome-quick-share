@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=GnomeQS
+Name[pt_BR]=GnomeQS
+Comment=Share files with nearby devices
+Comment[pt_BR]=Compartilhe arquivos com dispositivos próximos
+Exec=gnomeqs
+Icon=io.github.weversonl.GnomeQS
+Categories=Network;FileTransfer;
+Keywords=share;nearby;file;transfer;
+StartupNotify=true
+StartupWMClass=GnomeQS

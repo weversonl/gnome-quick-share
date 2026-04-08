@@ -1,0 +1,233 @@
+# Portuguese (Brazil) translations for GnomeQS
+# Copyright (C) 2024 weversonl
+# SPDX-License-Identifier: AGPL-3.0
+msgid ""
+msgstr ""
+"Project-Id-Version: GnomeQS 0.12.0\n"
+"Report-Msgid-Bugs-To: https://github.com/weversonl/gnomeqs/issues\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: pt_BR\n"
+
+msgid "Device name"
+msgstr "Nome do dispositivo"
+
+msgid "Visibility"
+msgstr "Visibilidade"
+
+msgid "Always visible"
+msgstr "Sempre visível"
+
+msgid "Hidden from everyone"
+msgstr "Oculto de todos"
+
+msgid "Temporarily visible"
+msgstr "Temporariamente visível"
+
+msgid "Nearby devices can share files with you. You'll always be notified and must approve each transfer."
+msgstr "Dispositivos próximos podem compartilhar arquivos com você. Você será sempre notificado e deverá aprovar."
+
+msgid "No one can see your device. If a device saved yours before, it might still try to transfer."
+msgstr "Nenhum dispositivo pode te ver. Se um dispositivo salvou o seu antes, ainda pode tentar transferir."
+
+msgid "You'll get a notification when someone nearby shares, letting you become visible for 1 minute."
+msgstr "Você receberá uma notificação quando alguém próximo compartilhar, podendo ficar visível por 1 minuto."
+
+msgid "You are temporarily visible to everyone."
+msgstr "Você está temporariamente visível para todos."
+
+msgid "Ready to receive"
+msgstr "Pronto para receber"
+
+msgid "Nearby devices"
+msgstr "Dispositivos próximos"
+
+msgid "Share with nearby devices"
+msgstr "Compartilhar com dispositivos próximos"
+
+msgid "Drop files to send"
+msgstr "Solte arquivos para enviar"
+
+msgid "Select"
+msgstr "Selecionar"
+
+msgid "Accept"
+msgstr "Aceitar"
+
+msgid "Decline"
+msgstr "Recusar"
+
+msgid "Cancel"
+msgstr "Cancelar"
+
+msgid "Clear"
+msgstr "Limpar"
+
+msgid "Open"
+msgstr "Abrir"
+
+msgid "Copy"
+msgstr "Copiar"
+
+msgid "Sending..."
+msgstr "Enviando..."
+
+msgid "Receiving..."
+msgstr "Recebendo..."
+
+msgid "Transfer cancelled"
+msgstr "Transferência cancelada"
+
+msgid "Transfer rejected"
+msgstr "Transferência recusada"
+
+msgid "Unexpected disconnection"
+msgstr "Desconexão inesperada"
+
+msgid "Receive"
+msgstr "Receber"
+
+msgid "Send"
+msgstr "Enviar"
+
+msgid "Settings"
+msgstr "Configurações"
+
+msgid "Close"
+msgstr "Fechar"
+
+msgid "Start on boot"
+msgstr "Iniciar com o sistema"
+
+msgid "Keep running on close"
+msgstr "Manter rodando ao fechar"
+
+msgid "Start minimized"
+msgstr "Iniciar minimizado"
+
+msgid "Theme"
+msgstr "Tema"
+
+msgid "Language"
+msgstr "Idioma"
+
+msgid "Change download folder"
+msgstr "Alterar pasta de download"
+
+msgid "Sharing"
+msgstr "Compartilhando"
+
+msgid "file"
+msgstr "arquivo"
+
+msgid "files"
+msgstr "arquivos"
+
+msgid "Wants to share"
+msgstr "Quer compartilhar"
+
+msgid "Received"
+msgstr "Recebido"
+
+msgid "text"
+msgstr "texto"
+
+msgid "Saved to"
+msgstr "Salvo em"
+
+msgid "Make sure both devices are unlocked, close together, and have Bluetooth on."
+msgstr "Certifique-se que ambos os dispositivos estão desbloqueados, próximos e com Bluetooth ativado."
+
+msgid "Font size"
+msgstr "Tamanho da fonte"
+
+msgid "Small"
+msgstr "Pequena"
+
+msgid "Normal"
+msgstr "Normal"
+
+msgid "Large"
+msgstr "Grande"
+
+msgid "Extra large"
+msgstr "Extra grande"
+
+msgid "About"
+msgstr "Sobre"
+
+msgid "Version"
+msgstr "Versão"
+
+msgid "Monochrome tray icon"
+msgstr "Ícone da tray monocromático"
+
+msgid "Port"
+msgstr "Porta"
+
+msgid "Restart required to apply"
+msgstr "É necessário reiniciar para aplicar"
+
+msgid "Restart required"
+msgstr "Reinício necessário"
+
+msgid "The port change will take effect after restarting the app."
+msgstr "A alteração da porta entrará em vigor após reiniciar o aplicativo."
+
+msgid "Restart now"
+msgstr "Reiniciar agora"
+
+msgid "Later"
+msgstr "Mais tarde"
+
+msgid "Show"
+msgstr "Exibir"
+
+msgid "Toggle visibility"
+msgstr "Alternar visibilidade"
+
+msgid "Quit"
+msgstr "Sair"
+
+msgid "General"
+msgstr "Geral"
+
+msgid "Behavior"
+msgstr "Comportamento"
+
+msgid "Appearance"
+msgstr "Aparência"
+
+msgid "Network"
+msgstr "Rede"
+
+msgid "Files"
+msgstr "Arquivos"
+
+msgid "System"
+msgstr "Sistema"
+
+msgid "Light"
+msgstr "Claro"
+
+msgid "Dark"
+msgstr "Escuro"
+
+msgid "English"
+msgstr "Inglês"
+
+msgid "Portuguese (Brazil)"
+msgstr "Português (Brasil)"
+
+msgid "Download folder"
+msgstr "Pasta de download"
+
+msgid "Refresh"
+msgstr "Atualizar"
+
+msgid "PIN"
+msgstr "PIN"
+
+msgid "GnomeQS wants to share"
+msgstr "GnomeQS quer compartilhar"

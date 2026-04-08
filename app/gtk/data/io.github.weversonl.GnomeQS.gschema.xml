@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="io.github.weversonl.GnomeQS"
+          path="/io/github/weversonl/GnomeQS/">
+
+    <!-- Behavior -->
+    <key name="autostart" type="b">
+      <default>false</default>
+      <summary>Start on login</summary>
+    </key>
+
+    <key name="keep-running-on-close" type="b">
+      <default>true</default>
+      <summary>Keep running in background when window is closed</summary>
+    </key>
+
+    <key name="start-minimized" type="b">
+      <default>false</default>
+      <summary>Start minimized to tray</summary>
+    </key>
+
+    <key name="tray-monochrome" type="b">
+      <default>false</default>
+      <summary>Use monochrome tray icon</summary>
+    </key>
+
+    <!-- Networking -->
+    <!-- 0 = Visible, 1 = Invisible, 2 = Temporarily -->
+    <key name="visibility" type="i">
+      <default>0</default>
+      <range min="0" max="2"/>
+      <summary>Device visibility state</summary>
+    </key>
+
+    <key name="port" type="i">
+      <default>0</default>
+      <range min="0" max="65535"/>
+      <summary>TCP port (0 = OS-assigned)</summary>
+    </key>
+
+    <!-- Appearance -->
+    <key name="color-scheme" type="s">
+      <default>'system'</default>
+      <choices>
+        <choice value='light'/>
+        <choice value='dark'/>
+        <choice value='system'/>
+      </choices>
+      <summary>Preferred color scheme</summary>
+    </key>
+
+    <key name="language" type="s">
+      <default>'en'</default>
+      <choices>
+        <choice value='en'/>
+        <choice value='pt_BR'/>
+      </choices>
+      <summary>UI language</summary>
+    </key>
+
+    <!-- 0=Small, 1=Normal, 2=Large, 3=XL -->
+    <key name="font-size" type="i">
+      <default>1</default>
+      <range min="0" max="3"/>
+      <summary>UI font size</summary>
+    </key>
+
+    <!-- Files -->
+    <key name="download-folder" type="s">
+      <default>''</default>
+      <summary>Custom download directory (empty = system default)</summary>
+    </key>
+
+    <!-- Window state -->
+    <key name="window-width" type="i">
+      <default>400</default>
+    </key>
+
+    <key name="window-height" type="i">
+      <default>650</default>
+    </key>
+
+    <key name="window-maximized" type="b">
+      <default>false</default>
+    </key>
+
+  </schema>
+</schemalist>

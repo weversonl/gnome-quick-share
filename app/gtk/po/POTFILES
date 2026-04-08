@@ -1,0 +1,7 @@
+src/ui/window.rs
+src/ui/receive_view.rs
+src/ui/send_view.rs
+src/ui/transfer_row.rs
+src/ui/device_tile.rs
+src/ui/settings_window.rs
+src/ui/tray.rs

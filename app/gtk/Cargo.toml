@@ -1,0 +1,31 @@
+[package]
+name = "gnomeqs"
+version = "0.12.0"
+edition = "2024"
+license = "AGPL-3.0"
+authors = ["weversonl"]
+
+[[bin]]
+name = "gnomeqs"
+path = "src/main.rs"
+
+[dependencies]
+gnomeqs_core = { path = "../../core_lib" }
+
+gtk4         = { version = "0.9", features = ["v4_12"] }
+libadwaita   = { version = "0.7", features = ["v1_6"] }
+glib         = "0.20"
+gio          = "0.20"
+
+async-channel = "2.3"
+tokio         = { version = "1.50", features = ["rt-multi-thread", "macros", "sync", "time"] }
+
+xdg           = "2.5"
+anyhow        = "1.0"
+log           = "0.4"
+env_logger    = "0.11"
+once_cell     = "1.20"
+gettextrs     = { version = "0.7", package = "gettext-rs", features = ["gettext-system"] }
+
+[build-dependencies]
+# no external build dependencies — glib-compile-schemas called via std::process::Command

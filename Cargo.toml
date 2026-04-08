@@ -1,0 +1,8 @@
+[workspace]
+members = ["core_lib", "app/gtk", "app/tray-helper"]
+resolver = "2"
+
+[profile.release]
+lto = true
+opt-level = 3
+codegen-units = 1
