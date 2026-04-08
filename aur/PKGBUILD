@@ -2,7 +2,7 @@
 pkgname=gnomeqs
 pkgver=0.12.0
 pkgrel=1
-pkgdesc="GnomeQS - QuickShare client for GNOME"
+pkgdesc="Quick Share client for GNOME"
 arch=('x86_64')
 url="https://github.com/weversonl/gnomeqs-gtk"
 license=('AGPL-3.0-only')
@@ -16,27 +16,23 @@ depends=(
   'openssl'
 )
 makedepends=(
+  'git'
   'rust'
   'cargo'
-  'glib2'
   'gettext'
 )
-source=()
-sha256sums=()
+source=("$pkgname::git+https://github.com/weversonl/gnomeqs-gtk.git")
+sha256sums=('SKIP')
 
 build() {
-  local _repo_root
-  _repo_root="$(cd "${startdir:-$(pwd)}/.." && pwd)"
-  cd "$_repo_root"
+  cd "$srcdir/$pkgname"
   export CARGO_TARGET_DIR="$srcdir/target"
   cargo build --release -p gnomeqs -p gnomeqs-tray
 }
 
 package() {
-  local _repo_root
-  _repo_root="$(cd "${startdir:-$(pwd)}/.." && pwd)"
   _bundledir="$srcdir/target/release"
-  cd "$_repo_root"
+  cd "$srcdir/$pkgname"
 
   # Binary
   install -Dm755 "$_bundledir/gnomeqs" "$pkgdir/usr/bin/gnomeqs"
@@ -44,19 +40,19 @@ package() {
 
   # Desktop entry
   install -dm755 "$pkgdir/usr/share/applications"
-  install -Dm644 "$_repo_root/app/gtk/data/io.github.weversonl.GnomeQS.desktop" \
+  install -Dm644 "$srcdir/$pkgname/app/gtk/data/io.github.weversonl.GnomeQS.desktop" \
     "$pkgdir/usr/share/applications/io.github.weversonl.GnomeQS.desktop"
 
   # AppStream metadata
-  install -Dm644 "$_repo_root/app/gtk/data/io.github.weversonl.GnomeQS.metainfo.xml" \
+  install -Dm644 "$srcdir/$pkgname/app/gtk/data/io.github.weversonl.GnomeQS.metainfo.xml" \
     "$pkgdir/usr/share/metainfo/io.github.weversonl.GnomeQS.metainfo.xml"
 
   # GSettings schema
-  install -Dm644 "$_repo_root/app/gtk/data/io.github.weversonl.GnomeQS.gschema.xml" \
+  install -Dm644 "$srcdir/$pkgname/app/gtk/data/io.github.weversonl.GnomeQS.gschema.xml" \
     "$pkgdir/usr/share/glib-2.0/schemas/io.github.weversonl.GnomeQS.gschema.xml"
 
   # Icons
-  _icondir="$_repo_root/app/gtk/data/icons"
+  _icondir="$srcdir/$pkgname/app/gtk/data/icons"
   install -Dm644 "$_icondir/32x32.png"      "$pkgdir/usr/share/icons/hicolor/32x32/apps/io.github.weversonl.GnomeQS.png"
   install -Dm644 "$_icondir/128x128.png"    "$pkgdir/usr/share/icons/hicolor/128x128/apps/io.github.weversonl.GnomeQS.png"
   install -Dm644 "$_icondir/128x128@2x.png" "$pkgdir/usr/share/icons/hicolor/256x256@2/apps/io.github.weversonl.GnomeQS.png"
@@ -69,6 +65,6 @@ package() {
   # Locales
   for lang in pt_BR; do
     install -dm755 "$pkgdir/usr/share/locale/$lang/LC_MESSAGES"
-    msgfmt -o "$pkgdir/usr/share/locale/$lang/LC_MESSAGES/gnomeqs.mo" "$_repo_root/app/gtk/po/$lang.po"
+    msgfmt -o "$pkgdir/usr/share/locale/$lang/LC_MESSAGES/gnomeqs.mo" "app/gtk/po/$lang.po"
   done
 }
