@@ -16,7 +16,5 @@ pkgbase = gnomeqs
 	depends = glib2
 	depends = dbus
 	depends = openssl
-	source = gnomeqs::git+https://github.com/weversonl/gnomeqs-gtk.git
-	sha256sums = SKIP
 
 pkgname = gnomeqs
