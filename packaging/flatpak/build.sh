@@ -3,15 +3,11 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 manifest="$root/packaging/flatpak/io.github.weversonl.GnomeQuickShare.json"
-vendor_dir="$root/packaging/flatpak/vendor"
 build_dir="$root/packaging/out/flatpak/build"
 repo_dir="$root/packaging/out/flatpak/repo"
 bundle="$root/packaging/out/flatpak/io.github.weversonl.GnomeQuickShare.flatpak"
 
-rm -rf "$vendor_dir" "$build_dir" "$repo_dir" "$bundle"
-mkdir -p "$vendor_dir"
-
-cargo vendor --locked "$vendor_dir" > /dev/null
+rm -rf "$build_dir" "$repo_dir" "$bundle"
 
 flatpak-builder \
   --force-clean \

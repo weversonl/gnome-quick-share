@@ -25,6 +25,10 @@ mod tray_ipc;
 mod ui;
 
 fn main() -> anyhow::Result<()> {
+    if handle_cli_flags() {
+        return Ok(());
+    }
+
     // ── Logging ───────────────────────────────────────────────────────────────
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
@@ -235,6 +239,24 @@ fn main() -> anyhow::Result<()> {
     rt.shutdown_timeout(Duration::from_secs(5));
 
     std::process::exit(exit_code.into());
+}
+
+fn handle_cli_flags() -> bool {
+    let mut args = std::env::args().skip(1);
+    match args.next().as_deref() {
+        Some("--version") | Some("-V") | Some("-v") => {
+            println!("gnomeqs {}", config::VERSION);
+            true
+        }
+        Some("--help") | Some("-h") => {
+            println!(
+                "GnomeQS {}\n\nUsage:\n  gnomeqs [OPTIONS]\n\nOptions:\n  -h, --help       Show this help message\n  -v, -V, --version    Show version information",
+                config::VERSION
+            );
+            true
+        }
+        _ => false,
+    }
 }
 
 /// Register Application-level GActions for notification button callbacks.
