@@ -1234,6 +1234,8 @@ dependencies = [
  "libadwaita",
  "log",
  "once_cell",
+ "serde",
+ "serde_json",
  "tokio",
  "tokio-util",
  "xdg",

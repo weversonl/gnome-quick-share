@@ -23,6 +23,7 @@ mod i18n;
 mod settings;
 mod state;
 mod tray_ipc;
+mod transfer_history;
 mod ui;
 
 fn main() -> anyhow::Result<()> {

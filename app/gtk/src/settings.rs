@@ -74,6 +74,14 @@ pub fn get_font_size() -> i32 {
     settings().int("font-size")
 }
 
+pub fn get_history_retention_days() -> i32 {
+    settings().int("history-retention-days").clamp(1, 365)
+}
+
+pub fn get_history_max_items() -> i32 {
+    settings().int("history-max-items").clamp(1, 500)
+}
+
 pub fn font_size_css_px() -> i32 {
     match get_font_size() {
         0 => 13,

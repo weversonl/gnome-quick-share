@@ -24,11 +24,15 @@ pub struct TransferRow {
     pub decline_btn: gtk4::Button,
     pub cancel_btn: gtk4::Button,
     pub open_btn: gtk4::Button,
+    pub show_folder_btn: gtk4::Button,
     pub copy_btn: gtk4::Button,
+    pub retry_btn: gtk4::Button,
     pub clear_btn: gtk4::Button,
     open_target: Rc<RefCell<Option<String>>>,
     copy_text: Rc<RefCell<Option<String>>>,
     pending_cancel: Rc<Cell<bool>>,
+    last_title: Rc<RefCell<String>>,
+    last_subtitle: Rc<RefCell<String>>,
 }
 
 impl TransferRow {
@@ -90,11 +94,24 @@ impl TransferRow {
         open_btn.set_hexpand(false);
         set_pointer_cursor(&open_btn);
 
+        let show_folder_btn = gtk4::Button::with_label(&tr!("Show folder"));
+        show_folder_btn.set_visible(false);
+        show_folder_btn.set_valign(gtk4::Align::Center);
+        show_folder_btn.set_hexpand(false);
+        set_pointer_cursor(&show_folder_btn);
+
         let copy_btn = gtk4::Button::with_label(&tr!("Copy"));
         copy_btn.set_visible(false);
         copy_btn.set_valign(gtk4::Align::Center);
         copy_btn.set_hexpand(false);
         set_pointer_cursor(&copy_btn);
+
+        let retry_btn = gtk4::Button::with_label(&tr!("Retry"));
+        retry_btn.add_css_class("suggested-action");
+        retry_btn.set_visible(false);
+        retry_btn.set_valign(gtk4::Align::Center);
+        retry_btn.set_hexpand(false);
+        set_pointer_cursor(&retry_btn);
 
         let clear_btn = gtk4::Button::with_label(&tr!("Clear"));
         clear_btn.set_visible(false);
@@ -115,7 +132,9 @@ impl TransferRow {
         button_stack.append(&decline_btn);
         button_stack.append(&cancel_btn);
         button_stack.append(&open_btn);
+        button_stack.append(&show_folder_btn);
         button_stack.append(&copy_btn);
+        button_stack.append(&retry_btn);
         button_stack.append(&clear_btn);
 
         let action_stack = gtk4::Box::new(gtk4::Orientation::Vertical, 6);
@@ -177,6 +196,8 @@ impl TransferRow {
 
         let open_target: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
         let copy_text: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
+        let last_title = Rc::new(RefCell::new(String::new()));
+        let last_subtitle = Rc::new(RefCell::new(String::new()));
 
         // ── Wire open button ────────────────────────────────────────────────
         {
@@ -205,6 +226,31 @@ impl TransferRow {
             });
         }
 
+        {
+            let open_target = Rc::clone(&open_target);
+            show_folder_btn.connect_clicked(move |_| {
+                let binding = open_target.borrow();
+                let Some(path) = binding.as_ref() else { return };
+
+                let target_path = PathBuf::from(path);
+                let folder = if target_path.is_dir() {
+                    target_path
+                } else {
+                    target_path
+                        .parent()
+                        .map(Path::to_path_buf)
+                        .unwrap_or(target_path)
+                };
+
+                let uri = gio::File::for_path(folder).uri().to_string();
+                if let Err(e) =
+                    gio::AppInfo::launch_default_for_uri(&uri, None::<&gio::AppLaunchContext>)
+                {
+                    log::warn!("Show folder failed: {e}");
+                }
+            });
+        }
+
         // ── Wire copy button ────────────────────────────────────────────────
         {
             let copy_text = Rc::clone(&copy_text);
@@ -227,11 +273,15 @@ impl TransferRow {
             decline_btn,
             cancel_btn,
             open_btn,
+            show_folder_btn,
             copy_btn,
+            retry_btn,
             clear_btn,
             open_target,
             copy_text,
             pending_cancel,
+            last_title,
+            last_subtitle,
         }
     }
 
@@ -239,6 +289,23 @@ impl TransferRow {
         self.clear_btn.connect_clicked(move |_| {
             f();
         });
+    }
+
+    pub fn connect_retry<F: Fn() + 'static>(&self, f: F) {
+        self.retry_btn.connect_clicked(move |_| {
+            f();
+        });
+    }
+
+    pub fn history_snapshot(&self) -> (String, String) {
+        (
+            self.last_title.borrow().clone(),
+            self.last_subtitle.borrow().clone(),
+        )
+    }
+
+    pub fn open_target_snapshot(&self) -> Option<String> {
+        self.open_target.borrow().clone()
     }
 
     /// Update all row widgets to reflect the current transfer state.
@@ -260,7 +327,9 @@ impl TransferRow {
         self.cancel_btn.set_visible(false);
         self.cancel_btn.set_sensitive(true);
         self.open_btn.set_visible(false);
+        self.show_folder_btn.set_visible(false);
         self.copy_btn.set_visible(false);
+        self.retry_btn.set_visible(false);
         self.clear_btn.set_visible(false);
         self.progress_bar.set_visible(false);
         self.pin_label.set_visible(false);
@@ -271,6 +340,7 @@ impl TransferRow {
         // Update device name / title
         if let Some(source) = &meta.source {
             self.row.set_title(&source.name);
+            *self.last_title.borrow_mut() = source.name.clone();
             let icon_name = match &source.device_type {
                 DeviceType::Phone => "phone-symbolic",
                 DeviceType::Tablet => "tablet-symbolic",
@@ -289,18 +359,23 @@ impl TransferRow {
                 self.button_stack.set_spacing(4);
                 let desc = build_transfer_description(meta);
                 self.row.set_subtitle(&desc);
+                *self.last_subtitle.borrow_mut() = desc;
                 self.accept_btn.set_visible(true);
                 self.decline_btn.set_visible(true);
             }
             State::ReceivingFiles => {
                 if self.pending_cancel.get() {
                     self.row.add_css_class("transfer-error");
-                    self.row.set_subtitle(&tr!("Cancelling..."));
+                    let subtitle = tr!("Cancelling transfer...");
+                    self.row.set_subtitle(&subtitle);
+                    *self.last_subtitle.borrow_mut() = subtitle;
                     self.cancel_btn.set_visible(true);
                     self.cancel_btn.set_sensitive(false);
                 } else {
                     self.row.add_css_class("transfer-active");
-                    self.row.set_subtitle(&tr!("Receiving..."));
+                    let subtitle = progress_subtitle(&tr!("Receiving"), meta);
+                    self.row.set_subtitle(&subtitle);
+                    *self.last_subtitle.borrow_mut() = subtitle;
                     self.progress_bar.set_visible(true);
                     self.cancel_btn.set_visible(true);
                     update_progress(&self.progress_bar, meta);
@@ -309,12 +384,16 @@ impl TransferRow {
             State::SendingFiles => {
                 if self.pending_cancel.get() {
                     self.row.add_css_class("transfer-error");
-                    self.row.set_subtitle(&tr!("Cancelling..."));
+                    let subtitle = tr!("Cancelling transfer...");
+                    self.row.set_subtitle(&subtitle);
+                    *self.last_subtitle.borrow_mut() = subtitle;
                     self.cancel_btn.set_visible(true);
                     self.cancel_btn.set_sensitive(false);
                 } else {
                     self.row.add_css_class("transfer-active");
-                    self.row.set_subtitle(&tr!("Sending..."));
+                    let subtitle = progress_subtitle(&tr!("Sending"), meta);
+                    self.row.set_subtitle(&subtitle);
+                    *self.last_subtitle.borrow_mut() = subtitle;
                     self.progress_bar.set_visible(true);
                     self.cancel_btn.set_visible(true);
                     update_progress(&self.progress_bar, meta);
@@ -329,9 +408,11 @@ impl TransferRow {
                     tr!("Received")
                 };
                 self.row.set_subtitle(&desc);
+                *self.last_subtitle.borrow_mut() = desc;
                 if let Some(path) = open_path {
                     *self.open_target.borrow_mut() = Some(path);
                     self.open_btn.set_visible(true);
+                    self.show_folder_btn.set_visible(true);
                 }
                 if meta.text_payload.is_some() {
                     *self.copy_text.borrow_mut() = meta.text_payload.clone();
@@ -341,21 +422,31 @@ impl TransferRow {
             }
             State::Rejected => {
                 self.row.add_css_class("transfer-error");
-                self.row.set_subtitle(&tr!("Transfer rejected"));
+                let subtitle = tr!("Transfer rejected");
+                self.row.set_subtitle(&subtitle);
+                *self.last_subtitle.borrow_mut() = subtitle;
                 self.clear_btn.set_visible(true);
+                self.retry_btn.set_visible(meta.files.is_some());
             }
             State::Cancelled => {
                 self.row.add_css_class("transfer-error");
-                self.row.set_subtitle(&tr!("Transfer cancelled"));
+                let subtitle = tr!("Transfer cancelled");
+                self.row.set_subtitle(&subtitle);
+                *self.last_subtitle.borrow_mut() = subtitle;
                 self.clear_btn.set_visible(true);
+                self.retry_btn.set_visible(meta.files.is_some());
             }
             State::Disconnected => {
                 self.row.add_css_class("transfer-error");
-                self.row.set_subtitle(&tr!("Unexpected disconnection"));
+                let subtitle = tr!("Connection lost during transfer");
+                self.row.set_subtitle(&subtitle);
+                *self.last_subtitle.borrow_mut() = subtitle;
                 self.clear_btn.set_visible(true);
+                self.retry_btn.set_visible(meta.files.is_some());
             }
             _ => {
                 self.row.set_subtitle("");
+                self.last_subtitle.borrow_mut().clear();
             }
         }
     }
@@ -394,5 +485,35 @@ fn build_transfer_description(meta: &TransferMetadata) -> String {
         format!("{} {}", tr!("Wants to share"), tr!("text"))
     } else {
         tr!("Wants to share")
+    }
+}
+
+fn progress_subtitle(prefix: &str, meta: &TransferMetadata) -> String {
+    if meta.total_bytes == 0 {
+        return format!("{prefix}...");
+    }
+
+    format!(
+        "{} · {} / {}",
+        prefix,
+        format_size(meta.ack_bytes),
+        format_size(meta.total_bytes)
+    )
+}
+
+fn format_size(bytes: u64) -> String {
+    const KB: f64 = 1024.0;
+    const MB: f64 = KB * 1024.0;
+    const GB: f64 = MB * 1024.0;
+    let bytes = bytes as f64;
+
+    if bytes >= GB {
+        format!("{:.1} GB", bytes / GB)
+    } else if bytes >= MB {
+        format!("{:.1} MB", bytes / MB)
+    } else if bytes >= KB {
+        format!("{:.1} KB", bytes / KB)
+    } else {
+        format!("{} B", bytes as u64)
     }
 }

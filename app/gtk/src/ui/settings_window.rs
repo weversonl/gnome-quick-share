@@ -43,6 +43,7 @@ fn build_general_page(
     page.add(&build_behavior_group(from_ui_tx));
     page.add(&build_appearance_group(win));
     page.add(&build_files_group(from_ui_tx, win));
+    page.add(&build_history_group());
     page.add(&build_network_group(win));
 
     page
@@ -235,6 +236,59 @@ fn build_files_group(
     }
 
     group.add(&folder_row);
+    group
+}
+
+// ── History ───────────────────────────────────────────────────────────────────
+
+fn build_history_group() -> libadwaita::PreferencesGroup {
+    let group = libadwaita::PreferencesGroup::new();
+    group.set_title(&tr!("History"));
+    group.set_description(Some(&tr!(
+        "Transfer history is stored locally and is automatically removed after the configured time. Default: 50 items for 7 days."
+    )));
+    let gsettings = settings();
+
+    let retention_row = libadwaita::SpinRow::new(
+        Some(&gtk4::Adjustment::new(
+            settings::get_history_retention_days() as f64,
+            1.0,
+            365.0,
+            1.0,
+            7.0,
+            0.0,
+        )),
+        1.0,
+        0,
+    );
+    retention_row.set_title(&tr!("Keep history for"));
+    retention_row.set_subtitle(&tr!("days"));
+    set_pointer_cursor(&retention_row);
+    gsettings
+        .bind("history-retention-days", &retention_row, "value")
+        .build();
+    group.add(&retention_row);
+
+    let max_items_row = libadwaita::SpinRow::new(
+        Some(&gtk4::Adjustment::new(
+            settings::get_history_max_items() as f64,
+            1.0,
+            500.0,
+            1.0,
+            25.0,
+            0.0,
+        )),
+        1.0,
+        0,
+    );
+    max_items_row.set_title(&tr!("History size"));
+    max_items_row.set_subtitle(&tr!("maximum items"));
+    set_pointer_cursor(&max_items_row);
+    gsettings
+        .bind("history-max-items", &max_items_row, "value")
+        .build();
+    group.add(&max_items_row);
+
     group
 }
 

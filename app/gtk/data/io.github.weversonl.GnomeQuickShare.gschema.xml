@@ -76,6 +76,19 @@
       <summary>Custom download directory (empty = system default)</summary>
     </key>
 
+    <!-- History -->
+    <key name="history-retention-days" type="i">
+      <default>7</default>
+      <range min="1" max="365"/>
+      <summary>How many days transfer history is kept</summary>
+    </key>
+
+    <key name="history-max-items" type="i">
+      <default>50</default>
+      <range min="1" max="500"/>
+      <summary>Maximum transfer history entries</summary>
+    </key>
+
     <!-- Window state -->
     <key name="window-width" type="i">
       <default>400</default>

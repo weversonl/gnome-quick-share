@@ -5,6 +5,7 @@ use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use gtk4::prelude::*;
+use libadwaita::prelude::*;
 
 use gnomeqs_core::channel::ChannelMessage;
 use gnomeqs_core::{
@@ -14,6 +15,7 @@ use gnomeqs_core::{
 use crate::bridge::{FromUi, WifiDirectSendRequest, WifiDirectSessionReady};
 use crate::settings;
 use crate::tr;
+use crate::transfer_history::{self, HistoryDirection, HistoryEntry};
 use super::cursor::set_pointer_cursor;
 use super::device_tile::DeviceTile;
 use super::pulse::build_pulse_placeholder;
@@ -26,7 +28,12 @@ pub struct SendView {
     from_ui_tx: async_channel::Sender<FromUi>,
     devices: Rc<RefCell<HashMap<String, DeviceTile>>>,
     transfers: Rc<RefCell<HashMap<String, TransferRow>>>,
+    sent_requests: Rc<RefCell<HashMap<String, RetryRequest>>>,
     transfer_list: gtk4::ListBox,
+    recent_list: gtk4::ListBox,
+    transfer_header: gtk4::Box,
+    transfers_heading: gtk4::Label,
+    history_button: gtk4::Button,
     devices_stack: gtk4::Stack,
     devices_placeholder: gtk4::Box,
     devices_scroll: gtk4::ScrolledWindow,
@@ -51,6 +58,14 @@ struct KnownMdnsEndpoint {
     device_type: DeviceType,
 }
 
+#[derive(Debug, Clone)]
+struct RetryRequest {
+    name: String,
+    device_type: DeviceType,
+    addr: String,
+    files: Vec<String>,
+}
+
 impl SendView {
     pub fn new(from_ui_tx: async_channel::Sender<FromUi>) -> Self {
         let root = gtk4::Box::new(gtk4::Orientation::Vertical, 0);
@@ -70,6 +85,8 @@ impl SendView {
         let devices: Rc<RefCell<HashMap<String, DeviceTile>>> =
             Rc::new(RefCell::new(HashMap::new()));
         let transfers: Rc<RefCell<HashMap<String, TransferRow>>> =
+            Rc::new(RefCell::new(HashMap::new()));
+        let sent_requests: Rc<RefCell<HashMap<String, RetryRequest>>> =
             Rc::new(RefCell::new(HashMap::new()));
         let endpoint_tx: Rc<RefCell<Option<tokio::sync::broadcast::Sender<EndpointInfo>>>> =
             Rc::new(RefCell::new(None));
@@ -144,6 +161,27 @@ impl SendView {
         content.append(&files_group);
 
         // ── Outbound transfer list ──────────────────────────────────────────
+        let transfer_header = gtk4::Box::new(gtk4::Orientation::Horizontal, 8);
+        transfer_header.set_margin_top(2);
+        transfer_header.set_margin_bottom(8);
+        transfer_header.set_margin_start(16);
+        transfer_header.set_margin_end(16);
+        transfer_header.set_visible(false);
+
+        let transfers_heading = gtk4::Label::new(Some(&tr!("Active transfers")));
+        transfers_heading.add_css_class("caption-heading");
+        transfers_heading.set_halign(gtk4::Align::Start);
+        transfers_heading.set_hexpand(true);
+
+        let history_button = gtk4::Button::with_label(&tr!("History"));
+        history_button.add_css_class("history-button");
+        history_button.set_visible(false);
+        set_pointer_cursor(&history_button);
+
+        transfer_header.append(&transfers_heading);
+        transfer_header.append(&history_button);
+        content.append(&transfer_header);
+
         let transfer_list = gtk4::ListBox::new();
         transfer_list.add_css_class("boxed-list");
         transfer_list.add_css_class("glass-card");
@@ -154,6 +192,27 @@ impl SendView {
         transfer_list.set_margin_start(12);
         transfer_list.set_margin_end(12);
         content.append(&transfer_list);
+
+        let recent_list = gtk4::ListBox::new();
+        recent_list.add_css_class("boxed-list");
+        recent_list.add_css_class("history-list");
+        recent_list.set_selection_mode(gtk4::SelectionMode::None);
+        recent_list.set_margin_top(0);
+        recent_list.set_margin_bottom(0);
+        recent_list.set_margin_start(0);
+        recent_list.set_margin_end(0);
+
+        let history_dialog = build_history_dialog(&tr!("Send history"), &recent_list);
+        {
+            let history_dialog = history_dialog.clone();
+            history_button.connect_clicked(move |btn| {
+                let Some(window) = btn.root().and_downcast::<gtk4::Window>() else {
+                    return;
+                };
+                history_dialog.present(Some(&window));
+            });
+        }
+        load_send_history(&recent_list, &history_button);
 
         // ── File picker button ────────────────────────────────────────────────
         {
@@ -379,7 +438,12 @@ impl SendView {
             from_ui_tx,
             devices,
             transfers,
+            sent_requests,
             transfer_list,
+            recent_list,
+            transfer_header,
+            transfers_heading,
+            history_button,
             devices_stack,
             devices_placeholder,
             devices_scroll: scroll,
@@ -440,6 +504,7 @@ impl SendView {
         let files = Rc::clone(&self.selected_files);
         let tx = self.from_ui_tx.clone();
         let pending_wifi_direct = Rc::clone(&self.pending_wifi_direct_send);
+        let sent_requests = Rc::clone(&self.sent_requests);
         let tile = DeviceTile::new(
             info.clone(),
             move || files.borrow().clone(),
@@ -475,6 +540,7 @@ impl SendView {
                     }
                 }
                 _ => {
+                    let retry_files = files.clone();
                     let transfer_id = format!(
                         "{}-{}",
                         endpoint.id,
@@ -494,6 +560,17 @@ impl SendView {
                         ),
                         ob: OutboundPayload::Files(files),
                     };
+                    sent_requests
+                        .borrow_mut()
+                        .insert(
+                            send_info.id.clone(),
+                            RetryRequest {
+                                name: send_info.name.clone(),
+                                device_type: send_info.device_type.clone(),
+                                addr: send_info.addr.clone(),
+                                files: retry_files,
+                            },
+                        );
                     if let Err(e) = tx.try_send(FromUi::SendPayload(send_info)) {
                         log::warn!("SendPayload failed: {e}");
                     }
@@ -560,16 +637,72 @@ impl SendView {
                 let id = id.clone();
                 let transfers = Rc::clone(&self.transfers);
                 let list = self.transfer_list.clone();
+                let recent_list = self.recent_list.clone();
+                let sent_requests = Rc::clone(&self.sent_requests);
+                let transfers_heading = self.transfers_heading.clone();
+                let transfer_header = self.transfer_header.clone();
+                let history_button = self.history_button.clone();
+                let tx_history = self.from_ui_tx.clone();
                 row.connect_clear(move || {
                     let mut map = transfers.borrow_mut();
                     if let Some(row) = map.remove(&id) {
+                        let (title, subtitle) = row.history_snapshot();
+                        let open_target = row.open_target_snapshot();
+                        let retry_request = if history_allows_retry(&subtitle) {
+                            sent_requests.borrow().get(&id).cloned()
+                        } else {
+                            None
+                        };
                         list.remove(&row.row);
+                        prepend_history_row(
+                            &recent_list,
+                            &title,
+                            &subtitle,
+                            retry_request,
+                            open_target,
+                            tx_history.clone(),
+                        );
+                        transfer_history::append(HistoryEntry {
+                            created_at: 0,
+                            direction: HistoryDirection::Send,
+                            title,
+                            subtitle,
+                            open_target: None,
+                        });
+                        history_button.set_visible(true);
                     }
                     list.set_visible(!map.is_empty());
+                    transfers_heading.set_visible(!map.is_empty());
+                    transfer_header.set_visible(!map.is_empty() || history_button.is_visible());
+                });
+            }
+            if let Some(send_info) = self.sent_requests.borrow().get(&id).cloned() {
+                let tx = self.from_ui_tx.clone();
+                row.connect_retry(move || {
+                    let retry_id = format!(
+                        "{}-retry-{}",
+                        send_info.addr,
+                        SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .map(|d| d.as_micros())
+                            .unwrap_or_default()
+                    );
+                    let retry_info = SendInfo {
+                        id: retry_id,
+                        name: send_info.name.clone(),
+                        device_type: send_info.device_type.clone(),
+                        addr: send_info.addr.clone(),
+                        ob: OutboundPayload::Files(send_info.files.clone()),
+                    };
+                    if let Err(e) = tx.try_send(FromUi::SendPayload(retry_info)) {
+                        log::warn!("Retry SendPayload failed: {e}");
+                    }
                 });
             }
             self.transfer_list.append(&row.row);
             self.transfer_list.set_visible(true);
+            self.transfers_heading.set_visible(true);
+            self.transfer_header.set_visible(true);
             row.update_state(&state, &meta);
             map.insert(id, row);
         } else if let Some(row) = map.get(&id) {
@@ -607,6 +740,7 @@ impl SendView {
                 .map(|d| d.as_micros())
                 .unwrap_or_default()
         );
+        let retry_files = pending.files.clone();
         let send_info = SendInfo {
             id: transfer_id,
             name: endpoint_name,
@@ -618,6 +752,17 @@ impl SendView {
             ),
             ob: OutboundPayload::Files(pending.files),
         };
+        self.sent_requests
+            .borrow_mut()
+            .insert(
+                send_info.id.clone(),
+                RetryRequest {
+                    name: send_info.name.clone(),
+                    device_type: send_info.device_type.clone(),
+                    addr: send_info.addr.clone(),
+                    files: retry_files,
+                },
+            );
 
         if let Err(e) = self.from_ui_tx.try_send(FromUi::SendPayload(send_info)) {
             log::warn!("auto SendPayload failed after Wi-Fi Direct activation: {e}");
@@ -711,6 +856,7 @@ impl SendView {
                 .map(|d| d.as_micros())
                 .unwrap_or_default()
         );
+        let retry_files = pending.files.clone();
         let send_info = SendInfo {
             id: transfer_id,
             name: known.name,
@@ -718,6 +864,17 @@ impl SendView {
             addr: format!("{}:{}", ip, known.port),
             ob: OutboundPayload::Files(pending.files),
         };
+        self.sent_requests
+            .borrow_mut()
+            .insert(
+                send_info.id.clone(),
+                RetryRequest {
+                    name: send_info.name.clone(),
+                    device_type: send_info.device_type.clone(),
+                    addr: send_info.addr.clone(),
+                    files: retry_files,
+                },
+            );
 
         if let Err(e) = self.from_ui_tx.try_send(FromUi::SendPayload(send_info)) {
             log::warn!("direct Wi-Fi Direct SendPayload failed: {e}");
@@ -746,6 +903,155 @@ fn build_network_summary_text() -> String {
     };
 
     port_summary
+}
+
+fn history_allows_retry(subtitle: &str) -> bool {
+    matches!(
+        subtitle,
+        s if s == tr!("Transfer rejected")
+            || s == tr!("Transfer cancelled")
+            || s == tr!("Connection lost during transfer")
+    )
+}
+
+fn build_history_dialog(title: &str, list: &gtk4::ListBox) -> libadwaita::PreferencesDialog {
+    let dialog = libadwaita::PreferencesDialog::new();
+    dialog.set_title(title);
+    dialog.set_search_enabled(false);
+
+    let page = libadwaita::PreferencesPage::new();
+    let group = libadwaita::PreferencesGroup::new();
+    group.set_description(Some(&history_retention_notice()));
+
+    let scroll = gtk4::ScrolledWindow::new();
+    scroll.set_policy(gtk4::PolicyType::Never, gtk4::PolicyType::Automatic);
+    scroll.set_min_content_width(300);
+    scroll.set_min_content_height(220);
+    scroll.set_max_content_height(420);
+    scroll.set_child(Some(list));
+
+    group.add(&scroll);
+    page.add(&group);
+    dialog.add(&page);
+    dialog
+}
+
+fn history_retention_notice() -> String {
+    tr!("Transfer history is stored locally for up to {} days by default, unless changed in Settings.")
+        .replace("{}", &settings::get_history_retention_days().to_string())
+}
+
+fn load_send_history(list: &gtk4::ListBox, history_button: &gtk4::Button) {
+    let entries = transfer_history::load(HistoryDirection::Send);
+    for entry in entries.into_iter().rev() {
+        prepend_history_row(list, &entry.title, &entry.subtitle, None, entry.open_target, async_channel::unbounded().0);
+    }
+    history_button.set_visible(list.first_child().is_some());
+}
+
+fn prepend_history_row(
+    list: &gtk4::ListBox,
+    title: &str,
+    subtitle: &str,
+    retry_request: Option<RetryRequest>,
+    open_target: Option<String>,
+    from_ui_tx: async_channel::Sender<FromUi>,
+) {
+    let row = gtk4::ListBoxRow::new();
+    row.add_css_class("history-row");
+    let row_title = if title.is_empty() {
+        tr!("Recent transfer")
+    } else {
+        title.to_string()
+    };
+
+    let body = gtk4::Box::new(gtk4::Orientation::Horizontal, 10);
+    body.set_width_request(300);
+    body.set_margin_top(8);
+    body.set_margin_bottom(8);
+    body.set_margin_start(10);
+    body.set_margin_end(10);
+
+    let icon = gtk4::Image::from_icon_name("history-symbolic");
+    icon.set_pixel_size(22);
+    body.append(&icon);
+
+    let text_box = gtk4::Box::new(gtk4::Orientation::Vertical, 2);
+    text_box.set_hexpand(true);
+
+    let title_label = gtk4::Label::new(Some(&row_title));
+    title_label.add_css_class("history-title");
+    title_label.set_halign(gtk4::Align::Start);
+    title_label.set_xalign(0.0);
+    title_label.set_ellipsize(gtk4::pango::EllipsizeMode::End);
+
+    let subtitle_label = gtk4::Label::new(Some(subtitle));
+    subtitle_label.add_css_class("history-subtitle");
+    subtitle_label.set_halign(gtk4::Align::Start);
+    subtitle_label.set_xalign(0.0);
+    subtitle_label.set_ellipsize(gtk4::pango::EllipsizeMode::End);
+
+    text_box.append(&title_label);
+    text_box.append(&subtitle_label);
+    body.append(&text_box);
+
+    if let Some(send_info) = retry_request {
+        let retry_btn = gtk4::Button::from_icon_name("view-refresh-symbolic");
+        retry_btn.set_tooltip_text(Some(&tr!("Retry")));
+        retry_btn.add_css_class("suggested-action");
+        retry_btn.add_css_class("history-icon-button");
+        set_pointer_cursor(&retry_btn);
+        let tx = from_ui_tx.clone();
+        retry_btn.connect_clicked(move |_| {
+            let retry_id = format!(
+                "{}-history-{}",
+                send_info.addr,
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .map(|d| d.as_micros())
+                    .unwrap_or_default()
+            );
+            let retry_info = SendInfo {
+                id: retry_id,
+                name: send_info.name.clone(),
+                device_type: send_info.device_type.clone(),
+                addr: send_info.addr.clone(),
+                ob: OutboundPayload::Files(send_info.files.clone()),
+            };
+            if let Err(e) = tx.try_send(FromUi::SendPayload(retry_info)) {
+                log::warn!("History retry failed: {e}");
+            }
+        });
+        body.append(&retry_btn);
+    }
+
+    if let Some(path) = open_target {
+        let show_btn = gtk4::Button::from_icon_name("folder-open-symbolic");
+        show_btn.set_tooltip_text(Some(&tr!("Show folder")));
+        show_btn.add_css_class("history-icon-button");
+        set_pointer_cursor(&show_btn);
+        show_btn.connect_clicked(move |_| {
+            let folder = Path::new(&path)
+                .parent()
+                .map(Path::to_path_buf)
+                .unwrap_or_else(|| Path::new(&path).to_path_buf());
+            let uri = gio::File::for_path(folder).uri().to_string();
+            if let Err(e) =
+                gio::AppInfo::launch_default_for_uri(&uri, None::<&gio::AppLaunchContext>)
+            {
+                log::warn!("History show folder failed: {e}");
+            }
+        });
+        body.append(&show_btn);
+    }
+
+    row.set_child(Some(&body));
+    list.insert(&row, 0);
+    list.set_visible(true);
+
+    while let Some(last) = list.row_at_index(6) {
+        list.remove(&last);
+    }
 }
 
 fn rebuild_selected_files_ui(

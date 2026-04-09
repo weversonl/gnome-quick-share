@@ -447,15 +447,54 @@ pub fn apply_custom_css() {
 }
 .app-window .network-summary-subtitle {
   font-size: 0.88em;
-  line-height: 1.25;
   opacity: 0.84;
 }
+.app-window .history-list {
+  margin-top: 0;
+}
+.app-window .history-button {
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.88em;
+  font-weight: 700;
+}
+.app-window .history-popover contents {
+  padding: 10px;
+  border-radius: 16px;
+}
+.app-window .history-title {
+  font-weight: 700;
+  font-size: 0.96em;
+}
+.app-window .history-subtitle {
+  opacity: 0.72;
+  font-size: 0.88em;
+}
+.app-window .history-icon-button {
+  border-radius: 999px;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+}
+.app-window .boxed-list row.history-row {
+  border-radius: 14px;
+}
+.app-window.dark-mode .boxed-list row.history-row {
+  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(62, 47, 128, 0.14));
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.app-window.light-mode .boxed-list row.history-row {
+  background: linear-gradient(180deg, rgba(255,255,255,0.82), rgba(229, 221, 255, 0.70));
+  border: 1px solid rgba(107, 86, 195, 0.10);
+}
 .app-window .caption-heading {
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  font-size: 0.9em;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  font-size: 0.94em;
   opacity: 0.74;
   font-weight: 700;
+  margin-top: 6px;
+  margin-bottom: 6px;
 }
 .app-window.dark-mode .boxed-list row:hover {
   background: color-mix(in srgb, #ffffff 8%, transparent);

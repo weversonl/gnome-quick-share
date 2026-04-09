@@ -70,6 +70,36 @@ msgstr "Abrir"
 msgid "Copy"
 msgstr "Copiar"
 
+msgid "Retry"
+msgstr "Tentar novamente"
+
+msgid "History"
+msgstr "Histórico"
+
+msgid "Send history"
+msgstr "Histórico de envio"
+
+msgid "Receive history"
+msgstr "Histórico de recebimento"
+
+msgid "Transfer history is stored locally for up to {} days by default, unless changed in Settings."
+msgstr "O histórico de transferências é armazenado localmente por até {} dias por padrão, a menos que seja alterado nas Configurações."
+
+msgid "Transfer history is stored locally and is automatically removed after the configured time. Default: 50 items for 7 days."
+msgstr "O histórico de transferências é armazenado localmente e removido automaticamente depois do tempo configurado. Padrão: 50 itens por 7 dias."
+
+msgid "Keep history for"
+msgstr "Manter histórico por"
+
+msgid "days"
+msgstr "dias"
+
+msgid "History size"
+msgstr "Tamanho do histórico"
+
+msgid "maximum items"
+msgstr "itens máximos"
+
 msgid "Sending..."
 msgstr "Enviando..."
 
@@ -315,3 +345,15 @@ msgstr "O Wi‑Fi Direct foi detectado, mas a interface P2P está indisponível 
 
 msgid "Wi-Fi Direct experimental backend is unavailable on this device."
 msgstr "O backend experimental de Wi‑Fi Direct não está disponível neste dispositivo."
+
+msgid "Active transfers"
+msgstr "Transferências ativas"
+
+msgid "Recent transfers"
+msgstr "Transferências recentes"
+
+msgid "Recent transfer"
+msgstr "Transferência recente"
+
+msgid "Show folder"
+msgstr "Mostrar pasta"
