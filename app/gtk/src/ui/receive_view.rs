@@ -148,7 +148,7 @@ impl ReceiveView {
                 history_dialog.present(Some(&window));
             });
         }
-        load_receive_history(&recent_list, &history_button);
+        load_receive_history(&recent_list, &history_button, &transfer_header);
 
         let stack = gtk4::Stack::new();
         stack.set_vexpand(true);
@@ -310,12 +310,18 @@ fn build_receive_history_dialog(list: &gtk4::ListBox) -> libadwaita::Preferences
     dialog
 }
 
-fn load_receive_history(list: &gtk4::ListBox, history_button: &gtk4::Button) {
+fn load_receive_history(
+    list: &gtk4::ListBox,
+    history_button: &gtk4::Button,
+    transfer_header: &gtk4::Box,
+) {
     let entries = transfer_history::load(HistoryDirection::Receive);
     for entry in entries.into_iter().rev() {
         prepend_receive_history_row(list, &entry.title, &entry.subtitle, entry.open_target);
     }
-    history_button.set_visible(list.first_child().is_some());
+    let has_history = list.first_child().is_some();
+    history_button.set_visible(has_history);
+    transfer_header.set_visible(has_history);
 }
 
 fn prepend_receive_history_row(

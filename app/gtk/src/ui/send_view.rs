@@ -212,7 +212,7 @@ impl SendView {
                 history_dialog.present(Some(&window));
             });
         }
-        load_send_history(&recent_list, &history_button);
+        load_send_history(&recent_list, &history_button, &transfer_header);
 
         // ── File picker button ────────────────────────────────────────────────
         {
@@ -941,12 +941,18 @@ fn history_retention_notice() -> String {
         .replace("{}", &settings::get_history_retention_days().to_string())
 }
 
-fn load_send_history(list: &gtk4::ListBox, history_button: &gtk4::Button) {
+fn load_send_history(
+    list: &gtk4::ListBox,
+    history_button: &gtk4::Button,
+    transfer_header: &gtk4::Box,
+) {
     let entries = transfer_history::load(HistoryDirection::Send);
     for entry in entries.into_iter().rev() {
         prepend_history_row(list, &entry.title, &entry.subtitle, None, entry.open_target, async_channel::unbounded().0);
     }
-    history_button.set_visible(list.first_child().is_some());
+    let has_history = list.first_child().is_some();
+    history_button.set_visible(has_history);
+    transfer_header.set_visible(has_history);
 }
 
 fn prepend_history_row(
