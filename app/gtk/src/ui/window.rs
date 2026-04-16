@@ -161,6 +161,7 @@ pub fn build_window(app: &libadwaita::Application, state: AppState) -> libadwait
     let receive_view_clone = Rc::clone(&receive_view);
     let send_view_clone = Rc::clone(&send_view);
     let toast_overlay_clone = toast_overlay.clone();
+    let stack_clone = stack.clone();
 
     glib::MainContext::default().spawn_local(async move {
         while let Ok(msg) = rx.recv().await {
@@ -220,6 +221,11 @@ pub fn build_window(app: &libadwaita::Application, state: AppState) -> libadwait
                     send_view_clone.handle_wifi_direct_session_ready(ready);
                 }
                 ToUi::ShowWindow => {
+                    win.set_visible(true);
+                    win.present();
+                }
+                ToUi::ShowWindowOnPage(page) => {
+                    stack_clone.set_visible_child_name(&page);
                     win.set_visible(true);
                     win.present();
                 }

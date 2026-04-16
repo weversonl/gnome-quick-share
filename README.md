@@ -32,12 +32,14 @@ Many implementation and product decisions in GnomeQS were informed by the work b
 - mDNS discovery via `mdns-sd`
 - Bluetooth support via Linux-specific crates such as `bluer` and `btleplug`
 - Ayatana AppIndicator for the tray helper
+- Meson as the build and install system
 
 ## Project Structure
 
 - [`core_lib`](./core_lib): transfer logic, discovery, networking, Bluetooth, inbound/outbound flow
 - [`app/gtk`](./app/gtk): GTK4/libadwaita application
 - [`app/tray-helper`](./app/tray-helper): tray helper process
+- [`build-aux`](./build-aux): build helper scripts used by Meson
 - [`aur`](./aur): Arch packaging files
 - [`packaging/flatpak`](./packaging/flatpak): Flatpak manifest and helpers
 - [`packaging/deb`](./packaging/deb): local Debian packaging helper
@@ -93,11 +95,12 @@ If discovery works but transfers do not start, firewall rules are one of the fir
 
 ## Local Development Requirements
 
-You need a Linux system with the Rust toolchain and GNOME-related development packages.
+You need a Linux system with the Rust toolchain, Meson, and GNOME-related development packages.
 
 Typical requirements:
 
 - Rust and Cargo
+- Meson (>= 1.0) and Ninja
 - GTK4 development files
 - libadwaita development files
 - GTK3 development files
@@ -108,12 +111,13 @@ Typical requirements:
 ### Arch Linux Example
 
 ```bash
-sudo pacman -S rust cargo gtk4 libadwaita gtk3 libayatana-appindicator glib2 gettext
+sudo pacman -S rust cargo meson ninja gtk4 libadwaita gtk3 libayatana-appindicator glib2 gettext
 ```
 
 ## Running Locally
 
-Run the app directly from the workspace:
+For day-to-day development, `cargo run` still works as before — schemas and
+locales are compiled on the fly by `build.rs`:
 
 ```bash
 cargo run -p gnomeqs
@@ -132,26 +136,32 @@ Then start it again:
 cargo run -p gnomeqs
 ```
 
-## Building Local Binaries
+## Building a Release with Meson
 
-Build release binaries locally:
+Meson is used for official release builds and all packaging workflows.
+It compiles both binaries, installs data files, schemas, icons, and locales
+to the correct system paths.
 
 ```bash
-cargo build --release -p gnomeqs
-cargo build --release -p gnomeqs-tray
+meson setup --buildtype=release build
+ninja -C build
+sudo meson install -C build
 ```
 
-Generated binaries:
+To install to a custom prefix (e.g. for testing without root):
 
-- `target/release/gnomeqs`
-- `target/release/gnomeqs-tray`
+```bash
+meson setup --prefix="$HOME/.local" --buildtype=release build
+ninja -C build
+meson install -C build
+```
 
 For a clean rebuild:
 
 ```bash
-cargo clean
-cargo build --release -p gnomeqs
-cargo build --release -p gnomeqs-tray
+rm -rf build
+meson setup --buildtype=release build
+ninja -C build
 ```
 
 ## Packaging
@@ -233,13 +243,14 @@ sudo apt-get install -f
 Typical extra local tooling on Debian-based systems:
 
 - `dpkg-dev`
+- `meson`, `ninja-build`
 - `gettext`
 - Rust toolchain
 - GTK4 development packages / libraries
 - libadwaita development packages / libraries
 - GTK3 development packages / libraries
 - Ayatana AppIndicator development packages / libraries
-- `glib2`
+- `libglib2.0-dev`
 
 ### Fedora / RHEL / Other RPM-Based Systems
 
@@ -262,13 +273,14 @@ sudo dnf install packaging/out/rpm/rpmbuild/RPMS/*/*.rpm
 Typical extra local tooling on RPM-based systems:
 
 - `rpm-build`
+- `meson`, `ninja-build`
 - `gettext`
 - Rust toolchain
 - GTK4 development packages / libraries
 - libadwaita development packages / libraries
 - GTK3 development packages / libraries
 - Ayatana AppIndicator development packages / libraries
-- `glib2`
+- `glib2-devel`
 
 ## Notes
 
@@ -276,6 +288,7 @@ Typical extra local tooling on RPM-based systems:
 - The tray helper exists because GTK4/libadwaita and Linux tray integration have different constraints.
 - Flatpak intentionally excludes the tray helper.
 - Packaging choices prioritize GNOME behavior and Linux desktop integration over broad platform reach.
+- `cargo run` still works for development; Meson is only required for release builds and packaging.
 
 ## License
 

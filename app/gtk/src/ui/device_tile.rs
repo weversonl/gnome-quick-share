@@ -4,7 +4,6 @@ use gnomeqs_core::{DeviceType, EndpointInfo, EndpointTransport};
 use crate::tr;
 use super::cursor::set_pointer_cursor;
 
-/// A button tile representing a single discovered nearby device.
 pub struct DeviceTile {
     pub button: gtk4::Button,
 }

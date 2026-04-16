@@ -27,11 +27,7 @@ pub enum TransferType {
 pub struct ChannelMessage {
     pub id: String,
     pub direction: ChannelDirection,
-
-    // Only present when channelDirection is frontToLib
     pub action: Option<ChannelAction>,
-
-    // Only present when channelDirection is libToFront
     pub rtype: Option<TransferType>,
     pub state: Option<State>,
     pub meta: Option<TransferMetadata>,

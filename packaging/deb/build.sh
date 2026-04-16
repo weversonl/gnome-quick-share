@@ -6,39 +6,20 @@ version="$(sed -n 's/^version = "\(.*\)"/\1/p' "$root/app/gtk/Cargo.toml" | head
 arch="$(dpkg --print-architecture)"
 pkgroot="$root/packaging/out/deb/gnome-quick-share_${version}_${arch}"
 artifact="$root/packaging/out/deb/gnome-quick-share_${version}_${arch}.deb"
+build_dir="$root/packaging/out/deb/meson-build"
 
-rm -rf "$pkgroot" "$artifact"
+rm -rf "$pkgroot" "$artifact" "$build_dir"
 mkdir -p "$pkgroot/DEBIAN"
 
-cargo build --release -p gnomeqs -p gnomeqs-tray
+cd "$root"
+meson setup \
+  --prefix=/usr \
+  --buildtype=release \
+  "$build_dir"
 
-install -Dm755 "$root/target/release/gnomeqs" "$pkgroot/usr/bin/gnomeqs"
-install -Dm755 "$root/target/release/gnomeqs-tray" "$pkgroot/usr/bin/gnomeqs-tray"
+ninja -C "$build_dir"
 
-install -Dm644 "$root/app/gtk/data/io.github.weversonl.GnomeQuickShare.desktop" \
-  "$pkgroot/usr/share/applications/io.github.weversonl.GnomeQuickShare.desktop"
-install -Dm644 "$root/app/gtk/data/io.github.weversonl.GnomeQuickShare.metainfo.xml" \
-  "$pkgroot/usr/share/metainfo/io.github.weversonl.GnomeQuickShare.metainfo.xml"
-install -Dm644 "$root/app/gtk/data/io.github.weversonl.GnomeQuickShare.gschema.xml" \
-  "$pkgroot/usr/share/glib-2.0/schemas/io.github.weversonl.GnomeQuickShare.gschema.xml"
-
-install -Dm644 "$root/app/gtk/data/icons/32x32.png" \
-  "$pkgroot/usr/share/icons/hicolor/32x32/apps/io.github.weversonl.GnomeQuickShare.png"
-install -Dm644 "$root/app/gtk/data/icons/128x128.png" \
-  "$pkgroot/usr/share/icons/hicolor/128x128/apps/io.github.weversonl.GnomeQuickShare.png"
-install -Dm644 "$root/app/gtk/data/icons/128x128@2x.png" \
-  "$pkgroot/usr/share/icons/hicolor/256x256@2/apps/io.github.weversonl.GnomeQuickShare.png"
-install -Dm644 "$root/app/gtk/data/icons/tray_mono.png" \
-  "$pkgroot/usr/share/icons/hicolor/32x32/apps/io.github.weversonl.GnomeQuickShare-symbolic.png"
-install -Dm644 "$root/app/gtk/data/icons/hicolor/scalable/actions/io.github.weversonl.GnomeQuickShare-airdrop-symbolic.svg" \
-  "$pkgroot/usr/share/icons/hicolor/scalable/actions/io.github.weversonl.GnomeQuickShare-airdrop-symbolic.svg"
-install -Dm644 "$root/app/gtk/data/icons/hicolor/scalable/status/io.github.weversonl.GnomeQuickShare-tray-symbolic.svg" \
-  "$pkgroot/usr/share/icons/hicolor/scalable/status/io.github.weversonl.GnomeQuickShare-tray-symbolic.svg"
-
-for lang in pt_BR; do
-  install -dm755 "$pkgroot/usr/share/locale/$lang/LC_MESSAGES"
-  msgfmt -o "$pkgroot/usr/share/locale/$lang/LC_MESSAGES/gnomeqs.mo" "$root/app/gtk/po/$lang.po"
-done
+DESTDIR="$pkgroot" meson install -C "$build_dir"
 
 cat > "$pkgroot/DEBIAN/control" <<EOF
 Package: gnome-quick-share
@@ -53,7 +34,7 @@ Description: GNOME Quick Share client
 EOF
 
 install -Dm755 "$root/packaging/deb/postinst" "$pkgroot/DEBIAN/postinst"
-install -Dm755 "$root/packaging/deb/postrm" "$pkgroot/DEBIAN/postrm"
+install -Dm755 "$root/packaging/deb/postrm"   "$pkgroot/DEBIAN/postrm"
 
 dpkg-deb --build --root-owner-group "$pkgroot" "$artifact"
 echo "Built $artifact"

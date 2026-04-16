@@ -10,18 +10,14 @@ thread_local! {
     static SETTINGS: RefCell<Option<gio::Settings>> = RefCell::new(None);
 }
 
-/// Returns the application's GSettings instance.
-/// Must be called after GLib types are initialised (i.e., after `gtk4::init()`).
 pub fn settings() -> gio::Settings {
     SETTINGS.with(|cell| {
         if let Some(s) = cell.borrow().as_ref() {
             return s.clone();
         }
 
-        // In debug builds, point GSettings at the schema compiled by build.rs.
         #[cfg(debug_assertions)]
         {
-            // SAFETY: called once, before any other threads touch the env.
             unsafe { std::env::set_var("GSETTINGS_SCHEMA_DIR", SCHEMA_DIR) };
         }
         let s = gio::Settings::new(APP_ID);
@@ -29,8 +25,6 @@ pub fn settings() -> gio::Settings {
         s
     })
 }
-
-// ── Convenience accessors ────────────────────────────────────────────────────
 
 pub fn get_autostart() -> bool {
     settings().boolean("autostart")
@@ -91,8 +85,6 @@ pub fn font_size_css_px() -> i32 {
     }
 }
 
-// ── XDG Autostart ────────────────────────────────────────────────────────────
-
 const AUTOSTART_CONTENT: &str = "[Desktop Entry]\n\
 Type=Application\n\
 Name=GnomeQS\n\
@@ -114,8 +106,6 @@ pub fn set_autostart(enable: bool) -> anyhow::Result<()> {
     Ok(())
 }
 
-// ── Color scheme ─────────────────────────────────────────────────────────────
-
 pub fn apply_color_scheme() {
     let scheme = settings().string("color-scheme");
     let cs = match scheme.as_str() {
@@ -125,8 +115,6 @@ pub fn apply_color_scheme() {
     };
     libadwaita::StyleManager::default().set_color_scheme(cs);
 }
-
-// ── Window state ─────────────────────────────────────────────────────────────
 
 pub fn save_window_state(width: i32, height: i32, maximized: bool) {
     let s = settings();

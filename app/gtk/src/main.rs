@@ -31,33 +31,25 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    // ── Logging ───────────────────────────────────────────────────────────────
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
-    // ── GSettings schema (debug) ─────────────────────────────────────────────
     #[cfg(debug_assertions)]
     {
-        // Ensure schemas compiled by build.rs are discoverable at runtime.
         unsafe { std::env::set_var("GSETTINGS_SCHEMA_DIR", config::SCHEMA_DIR) };
     }
 
-    // ── GTK / Libadwaita init (required before GSettings) ────────────────────
     gtk4::init()?;
     libadwaita::init()?;
 
-    // ── i18n ──────────────────────────────────────────────────────────────────
     let language = settings::get_language();
     i18n::init(Some(&language));
 
-    // ── Apply saved color scheme before the window appears ────────────────────
     settings::apply_color_scheme();
 
-    // ── Tokio runtime ─────────────────────────────────────────────────────────
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
 
-    // ── Start RQS service ─────────────────────────────────────────────────────
     let visibility = Visibility::from_raw_value(settings::get_visibility_raw() as u64);
     let port = settings::get_port();
     let download_path = settings::get_download_folder();
@@ -69,11 +61,9 @@ fn main() -> anyhow::Result<()> {
 
     let (core_rqs, send_info_tx, ble_rx) = rqs;
 
-    // ── Async channels ────────────────────────────────────────────────────────
     let (to_ui_tx, to_ui_rx) = async_channel::bounded::<ToUi>(128);
     let (from_ui_tx, from_ui_rx) = async_channel::unbounded::<FromUi>();
 
-    // ── Bridge task 1: broadcast::Sender<ChannelMessage> → to_ui_tx ──────────
     {
         let mut msg_rx = core_rqs.message_sender.subscribe();
         let tx = to_ui_tx.clone();
@@ -94,7 +84,6 @@ fn main() -> anyhow::Result<()> {
         });
     }
 
-    // ── Bridge task 2: BLE nearby signal → to_ui_tx ───────────────────────────
     {
         let mut rx = ble_rx;
         let tx = to_ui_tx.clone();
@@ -119,7 +108,6 @@ fn main() -> anyhow::Result<()> {
         });
     }
 
-    // ── Bridge task 3: visibility watch → to_ui_tx + GSettings ───────────────
     let tray_handle = tray_ipc::initialize_tray_runtime();
 
     if let Some(handle) = tray_handle.as_ref() {
@@ -175,7 +163,6 @@ fn main() -> anyhow::Result<()> {
         });
     }
 
-    // ── Bridge task 4: FromUi commands → RQS ─────────────────────────────────
     let rqs_arc = Arc::new(Mutex::new(core_rqs));
     let discovery_task: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>> =
         Arc::new(Mutex::new(None));
@@ -203,7 +190,6 @@ fn main() -> anyhow::Result<()> {
         });
     }
 
-    // ── Build AdwApplication ──────────────────────────────────────────────────
     let app = libadwaita::Application::new(Some(config::APP_ID), gio::ApplicationFlags::empty());
 
     {
@@ -211,23 +197,19 @@ fn main() -> anyhow::Result<()> {
         let to_ui_rx = to_ui_rx.clone();
 
         app.connect_activate(move |app| {
-            // Check if a window already exists (single-instance re-activation)
             if let Some(win) = app.active_window() {
                 win.present();
                 return;
             }
 
-            // Register application-level actions for notification buttons
             register_app_actions(app, from_ui_tx.clone());
 
-            // Build main window
             let app_state = AppState {
                 from_ui_tx: from_ui_tx.clone(),
                 to_ui_rx: to_ui_rx.clone(),
             };
             let window = ui::window::build_window(app, app_state);
 
-            // Handle start-minimized
             if settings::get_start_minimized() {
                 window.set_visible(false);
             } else {
@@ -236,13 +218,27 @@ fn main() -> anyhow::Result<()> {
         });
     }
 
-    // ── Enter tokio runtime context so tokio::spawn works in GTK handlers ─────
+    {
+        let tx = to_ui_tx.clone();
+        let action = gio::SimpleAction::new("show-receive", None);
+        action.connect_activate(move |_, _| {
+            let _ = tx.try_send(ToUi::ShowWindowOnPage("receive".to_string()));
+        });
+        app.add_action(&action);
+    }
+    {
+        let tx = to_ui_tx.clone();
+        let action = gio::SimpleAction::new("show-send", None);
+        action.connect_activate(move |_, _| {
+            let _ = tx.try_send(ToUi::ShowWindowOnPage("send".to_string()));
+        });
+        app.add_action(&action);
+    }
+
     let _guard = rt.enter();
 
-    // ── Run GTK main loop ─────────────────────────────────────────────────────
     let exit_code = app.run();
 
-    // ── Cleanup ───────────────────────────────────────────────────────────────
     drop(_guard);
     rt.block_on(async {
         rqs_arc.lock().unwrap().stop().await;
@@ -273,9 +269,7 @@ fn handle_cli_flags() -> bool {
     }
 }
 
-/// Register Application-level GActions for notification button callbacks.
 fn register_app_actions(app: &libadwaita::Application, from_ui_tx: async_channel::Sender<FromUi>) {
-    // accept-transfer(s) action
     {
         let tx = from_ui_tx.clone();
         let action = gio::SimpleAction::new("accept-transfer", Some(glib::VariantTy::STRING));
@@ -289,7 +283,6 @@ fn register_app_actions(app: &libadwaita::Application, from_ui_tx: async_channel
         app.add_action(&action);
     }
 
-    // reject-transfer(s) action
     {
         let tx = from_ui_tx.clone();
         let action = gio::SimpleAction::new("reject-transfer", Some(glib::VariantTy::STRING));
@@ -325,7 +318,6 @@ fn register_app_actions(app: &libadwaita::Application, from_ui_tx: async_channel
     }
 }
 
-/// Process a command sent from the GTK UI to the Tokio service layer.
 async fn handle_from_ui(
     cmd: FromUi,
     rqs: &Arc<Mutex<RQS>>,
@@ -344,7 +336,6 @@ async fn handle_from_ui(
                 state: None,
                 meta: None,
             };
-            // Broadcast to RQS handlers via message_sender
             let _ = rqs.lock().unwrap().message_sender.send(msg);
         }
         FromUi::Reject(id) => {

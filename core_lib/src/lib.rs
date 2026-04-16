@@ -61,15 +61,11 @@ static CUSTOM_DOWNLOAD: Lazy<RwLock<Option<PathBuf>>> = Lazy::new(|| RwLock::new
 pub struct RQS {
     tracker: Option<TaskTracker>,
     ctoken: Option<CancellationToken>,
-    // Discovery token is different than ctoken because he is on his own
-    // - can be cancelled while the ctoken is still active
     discovery_ctk: Option<CancellationToken>,
 
-    // Used to trigger a change in the mDNS visibility (and later on, BLE)
     pub visibility_sender: Arc<Mutex<watch::Sender<Visibility>>>,
     visibility_receiver: watch::Receiver<Visibility>,
 
-    // Only used to send the info "a nearby device is sharing"
     ble_sender: broadcast::Sender<()>,
 
     port_number: Option<u32>,
@@ -97,7 +93,6 @@ impl RQS {
         let (cancel_sender, _) = broadcast::channel(32);
         let (ble_sender, _) = broadcast::channel(5);
 
-        // Define default visibility as per the args inside the new()
         let (visibility_sender, visibility_receiver) = watch::channel(Visibility::Invisible);
         let _ = visibility_sender.send(visibility);
 
@@ -132,9 +127,7 @@ impl RQS {
         let binded_addr = tcp_listener.local_addr()?;
         info!("TcpListener on: {}", binded_addr);
 
-        // MPSC for the TcpServer
         let send_channel = mpsc::channel(10);
-        // Start TcpServer in own "task"
         let mut server = TcpServer::new(
             endpoint_id[..4].try_into()?,
             tcp_listener,
@@ -147,14 +140,12 @@ impl RQS {
 
         #[cfg(feature = "experimental")]
         {
-            // Don't threat BleListener error as fatal, it's a nice to have.
             if let Ok(ble) = BleListener::new(self.ble_sender.clone()).await {
                 let ctk = ctoken.clone();
                 tracker.spawn(async move { ble.run(ctk).await });
             }
         }
 
-        // Start MDnsServer in own "task"
         let mut mdns = MDnsServer::new(
             endpoint_id[..4].try_into()?,
             binded_addr.port(),
@@ -241,7 +232,6 @@ impl RQS {
         self.tracker = None;
     }
 
-    // Setting None here will resume the default settings
     pub fn set_download_path(&self, p: Option<PathBuf>) {
         debug!("Setting the download path to {:?}", p);
         let mut guard = CUSTOM_DOWNLOAD.write().unwrap();

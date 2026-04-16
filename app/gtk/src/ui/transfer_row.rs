@@ -13,7 +13,6 @@ use crate::bridge::FromUi;
 use crate::tr;
 use super::cursor::set_pointer_cursor;
 
-/// All widgets that make up a single transfer row entry.
 pub struct TransferRow {
     pub row: libadwaita::ActionRow,
     pub icon: gtk4::Image,
@@ -40,26 +39,22 @@ impl TransferRow {
         id: String,
         from_ui_tx: async_channel::Sender<FromUi>,
     ) -> Self {
-        // ── Row ──────────────────────────────────────────────────────────────
         let row = libadwaita::ActionRow::new();
         row.set_activatable(false);
         row.add_css_class("transfer-row");
         row.set_title_lines(3);
         row.set_subtitle_lines(3);
 
-        // ── Device icon (prefix) ─────────────────────────────────────────────
         let icon = gtk4::Image::from_icon_name("computer-symbolic");
         icon.set_icon_size(gtk4::IconSize::Large);
         row.add_prefix(&icon);
 
-        // ── PIN label (inside subtitle area) ─────────────────────────────────
         let pin_label = gtk4::Label::new(None);
         pin_label.add_css_class("pin-badge");
         pin_label.set_halign(gtk4::Align::End);
         pin_label.set_valign(gtk4::Align::Center);
         pin_label.set_visible(false);
 
-        // ── Progress bar ──────────────────────────────────────────────────────
         let progress_bar = gtk4::ProgressBar::new();
         progress_bar.set_show_text(false);
         progress_bar.set_visible(false);
@@ -67,7 +62,6 @@ impl TransferRow {
         progress_bar.set_width_request(92);
         progress_bar.set_hexpand(false);
 
-        // ── Action buttons (suffix) ───────────────────────────────────────────
         let accept_btn = gtk4::Button::with_label(&tr!("Accept"));
         accept_btn.add_css_class("suggested-action");
         accept_btn.set_visible(false);
@@ -146,7 +140,6 @@ impl TransferRow {
         action_stack.append(&button_stack);
         row.add_suffix(&action_stack);
 
-        // ── Wire accept button ───────────────────────────────────────────────
         {
             let tx = from_ui_tx.clone();
             let id2 = id.clone();
@@ -157,7 +150,6 @@ impl TransferRow {
             });
         }
 
-        // ── Wire decline button ──────────────────────────────────────────────
         {
             let tx = from_ui_tx.clone();
             let id2 = id.clone();
@@ -170,7 +162,6 @@ impl TransferRow {
 
         let pending_cancel = Rc::new(Cell::new(false));
 
-        // ── Wire cancel button ───────────────────────────────────────────────
         {
             let tx = from_ui_tx.clone();
             let id2 = id.clone();
@@ -199,7 +190,6 @@ impl TransferRow {
         let last_title = Rc::new(RefCell::new(String::new()));
         let last_subtitle = Rc::new(RefCell::new(String::new()));
 
-        // ── Wire open button ────────────────────────────────────────────────
         {
             let open_target = Rc::clone(&open_target);
             open_btn.connect_clicked(move |_| {
@@ -251,7 +241,6 @@ impl TransferRow {
             });
         }
 
-        // ── Wire copy button ────────────────────────────────────────────────
         {
             let copy_text = Rc::clone(&copy_text);
             copy_btn.connect_clicked(move |_| {
@@ -308,7 +297,6 @@ impl TransferRow {
         self.open_target.borrow().clone()
     }
 
-    /// Update all row widgets to reflect the current transfer state.
     pub fn update_state(&self, state: &State, meta: &TransferMetadata) {
         if matches!(
             state,
@@ -321,7 +309,6 @@ impl TransferRow {
         self.row.remove_css_class("transfer-success");
         self.row.remove_css_class("transfer-error");
 
-        // Hide all action widgets first
         self.accept_btn.set_visible(false);
         self.decline_btn.set_visible(false);
         self.cancel_btn.set_visible(false);
@@ -337,7 +324,6 @@ impl TransferRow {
         *self.open_target.borrow_mut() = None;
         *self.copy_text.borrow_mut() = None;
 
-        // Update device name / title
         if let Some(source) = &meta.source {
             self.row.set_title(&source.name);
             *self.last_title.borrow_mut() = source.name.clone();
@@ -462,7 +448,6 @@ fn resolve_open_target(meta: &TransferMetadata) -> Option<String> {
     let dest = meta.destination.as_ref()?;
     let dest_path = PathBuf::from(dest);
 
-    // If destination is a directory and we have a single file, open that file.
     if dest_path.is_dir() {
         if let Some(files) = &meta.files {
             if files.len() == 1 {
@@ -472,7 +457,6 @@ fn resolve_open_target(meta: &TransferMetadata) -> Option<String> {
         return Some(dest_path.to_string_lossy().into_owned());
     }
 
-    // Destination is already a file path.
     Some(dest_path.to_string_lossy().into_owned())
 }
 
