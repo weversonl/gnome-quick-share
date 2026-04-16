@@ -37,7 +37,7 @@
         {
           "type": "git",
           "url": "https://github.com/weversonl/gnome-quick-share.git",
-          "commit": "55047061aee000587b122d6779dc7414f2ac4a99"
+          "commit": "7fdacc03fddeed9f15a071c7914b613cc741c036"
         },
         "cargo-sources.json"
       ]
