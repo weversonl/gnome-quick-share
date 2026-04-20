@@ -34,7 +34,18 @@ impl DeviceTile {
 
         let icon = gtk4::Image::from_icon_name(icon_name);
         icon.set_icon_size(gtk4::IconSize::Large);
-        icon.set_pixel_size(48);
+        icon.set_pixel_size(40);
+        icon.set_margin_top(10);
+        icon.set_margin_bottom(10);
+        icon.set_margin_start(10);
+        icon.set_margin_end(10);
+
+        let icon_circle = gtk4::Box::new(gtk4::Orientation::Vertical, 0);
+        icon_circle.add_css_class("device-icon-circle");
+        icon_circle.set_halign(gtk4::Align::Center);
+        icon_circle.set_valign(gtk4::Align::Center);
+        icon_circle.set_size_request(62, 62);
+        icon_circle.append(&icon);
 
         let label = gtk4::Label::new(Some(&name));
         label.add_css_class("device-tile-title");
@@ -72,7 +83,7 @@ impl DeviceTile {
         }
         transport_badge.set_halign(gtk4::Align::Center);
 
-        vbox.append(&icon);
+        vbox.append(&icon_circle);
         vbox.append(&label);
         vbox.append(&meta);
         vbox.append(&transport_badge);

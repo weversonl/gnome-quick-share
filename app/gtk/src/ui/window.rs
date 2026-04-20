@@ -239,23 +239,26 @@ pub fn apply_custom_css() {
     let Some(display) = gdk::Display::default() else { return };
     let font_size_px = settings::font_size_css_px();
     let css = r#"
+/* ── Window backgrounds ────────────────────────────────────── */
 .app-window.dark-mode {
   background:
-    radial-gradient(circle at 22% 12%, rgba(132, 92, 255, 0.34) 0%, rgba(132, 92, 255, 0.00) 28%),
-    radial-gradient(circle at 74% 18%, rgba(98, 225, 255, 0.10) 0%, rgba(98, 225, 255, 0.00) 18%),
-    radial-gradient(circle at 50% 70%, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.00) 22%),
-    linear-gradient(165deg, #24185f 0%, #15133c 46%, #090918 100%);
-  color: #e9e7ff;
+    radial-gradient(ellipse 64% 42% at 16% 6%,  rgba(110, 65, 255, 0.38) 0%, transparent 100%),
+    radial-gradient(ellipse 40% 28% at 84% 14%, rgba(50, 200, 255, 0.10) 0%, transparent 100%),
+    radial-gradient(ellipse 70% 55% at 50% 95%, rgba(220, 60, 200, 0.05) 0%, transparent 100%),
+    linear-gradient(162deg, #160f3a 0%, #0d0b26 50%, #060511 100%);
+  color: #ebe7ff;
   font-size: __FONT_SIZE_PX__px;
 }
 .app-window.light-mode {
-  background: linear-gradient(180deg, #f6f2ff 0%, #ece6ff 52%, #e2ddff 100%);
-  color: #231942;
+  background:
+    radial-gradient(ellipse 60% 50% at 20% 0%,  rgba(155, 115, 255, 0.14) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 30% at 86% 96%, rgba(70, 195, 255, 0.07) 0%, transparent 100%),
+    linear-gradient(175deg, #f5f1ff 0%, #ece5ff 55%, #e1d9ff 100%);
+  color: #1c1338;
   font-size: __FONT_SIZE_PX__px;
 }
-.app-window .app-root {
-  background: transparent;
-}
+
+/* ── Global font size ───────────────────────────────────────── */
 .app-window label,
 .app-window entry,
 .app-window textview,
@@ -268,6 +271,9 @@ pub fn apply_custom_css() {
 .app-window listview {
   font-size: __FONT_SIZE_PX__px;
 }
+
+/* ── Root & HeaderBar ───────────────────────────────────────── */
+.app-window .app-root { background: transparent; }
 .app-window .headerbar,
 .app-window headerbar {
   background: transparent;
@@ -275,445 +281,417 @@ pub fn apply_custom_css() {
   box-shadow: none;
 }
 
+/* ── Glass Cards ────────────────────────────────────────────── */
 .app-window.dark-mode .glass-card,
 .app-window.dark-mode .boxed-list {
-  background:
-    linear-gradient(180deg, rgba(100, 79, 196, 0.32), rgba(44, 32, 91, 0.22));
-  border-radius: 16px;
-  border: 1px solid rgba(255,255,255,0.16);
+  background: linear-gradient(150deg, rgba(255,255,255,0.09) 0%, rgba(72,52,175,0.18) 100%);
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.13);
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.10),
-    inset 0 -1px 0 rgba(0,0,0,0.12),
-    0 18px 42px rgba(0,0,0,0.34);
+    inset 0 1px 0 rgba(255,255,255,0.11),
+    inset 0 -1px 0 rgba(0,0,0,0.10),
+    0 16px 44px rgba(0,0,0,0.38);
 }
 .app-window.light-mode .glass-card,
 .app-window.light-mode .boxed-list {
-  background: color-mix(in srgb, #7c6acb 22%, white);
-  border-radius: 16px;
-  border: 1px solid color-mix(in srgb, #6d5bb3 22%, transparent);
-  box-shadow: 0 14px 34px rgba(44, 27, 86, 0.16);
+  background: linear-gradient(150deg, rgba(255,255,255,0.92) 0%, rgba(212,196,255,0.62) 100%);
+  border-radius: 18px;
+  border: 1px solid rgba(138,110,210,0.17);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.95),
+    0 12px 34px rgba(76,52,160,0.14);
 }
 .app-window .boxed-list row,
-.app-window .boxed-list listitem {
-  background: transparent;
-}
+.app-window .boxed-list listitem { background: transparent; }
+
+/* ── Drop Zone ──────────────────────────────────────────────── */
 .app-window .send-drop-card {
   padding: 26px 20px;
-  border-radius: 18px;
+  border-radius: 20px;
+  transition: box-shadow 220ms ease, border-color 220ms ease;
 }
 .app-window.dark-mode .send-drop-card {
-  background:
-    linear-gradient(180deg, rgba(83, 64, 168, 0.28), rgba(41, 31, 87, 0.20));
+  background: linear-gradient(165deg, rgba(95,70,195,0.22) 0%, rgba(48,36,98,0.18) 100%);
 }
 .app-window.light-mode .send-drop-card {
-  background:
-    linear-gradient(180deg, rgba(124, 106, 203, 0.20), rgba(255, 255, 255, 0.52));
+  background: linear-gradient(165deg, rgba(195,178,255,0.32) 0%, rgba(255,255,255,0.65) 100%);
 }
 .app-window .send-drop-icon {
-  opacity: 0.82;
+  opacity: 0.84;
+  transition: transform 220ms cubic-bezier(0.34,1.56,0.64,1), opacity 200ms ease;
+}
+.app-window .send-drop-card.send-drop-active .send-drop-icon {
+  transform: scale(1.14);
+  opacity: 1.0;
 }
 .app-window .send-drop-title {
-  font-size: 1.14em;
+  font-size: 1.12em;
   font-weight: 700;
+  letter-spacing: -0.01em;
 }
-.app-window.dark-mode .send-drop-title {
-  color: #f2eeff;
-}
-.app-window.light-mode .send-drop-title {
-  color: #2f235d;
-}
-.app-window .send-drop-subtitle {
-  font-size: 0.96em;
-  opacity: 0.78;
-}
-.app-window .send-drop-meta {
-  font-size: 0.84em;
-  opacity: 0.72;
-}
+.app-window.dark-mode .send-drop-title { color: #f0ecff; }
+.app-window.light-mode .send-drop-title { color: #28195a; }
+.app-window .send-drop-subtitle { font-size: 0.95em; opacity: 0.76; }
+.app-window .send-drop-meta     { font-size: 0.84em; opacity: 0.68; }
 .app-window .send-drop-card.send-drop-active {
-  border: 1px solid rgba(120, 196, 255, 0.55);
+  border: 1.5px solid rgba(118,194,255,0.68);
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.12),
-    0 0 0 1px rgba(120, 196, 255, 0.10),
-    0 18px 32px rgba(54, 121, 255, 0.12);
+    0 0 0 3px rgba(118,194,255,0.14),
+    inset 0 1px 0 rgba(255,255,255,0.14),
+    0 22px 44px rgba(50,118,255,0.18);
 }
+
+/* ── Select / Clear buttons ─────────────────────────────────── */
 .app-window .send-select-button {
   border-radius: 12px;
-  padding: 10px 18px;
+  padding: 10px 20px;
   font-weight: 700;
+  letter-spacing: 0.01em;
+  transition: transform 130ms cubic-bezier(0.34,1.56,0.64,1), box-shadow 160ms ease, filter 140ms ease;
 }
-.app-window .selected-file-overlay {
-  margin: 1px 5px 5px 1px;
+.app-window .send-select-button:hover  { transform: translateY(-2px); }
+.app-window .send-select-button:active { transform: translateY(0px); filter: brightness(0.94); }
+.app-window.dark-mode .send-select-button {
+  background: linear-gradient(180deg, rgba(110,84,218,0.52) 0%, rgba(76,54,172,0.38) 100%);
+  border: 1px solid rgba(255,255,255,0.14);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.14), 0 8px 22px rgba(0,0,0,0.26);
 }
+.app-window.light-mode .send-select-button {
+  background: linear-gradient(180deg, rgba(118,94,228,0.24) 0%, rgba(255,255,255,0.62) 100%);
+  border: 1px solid rgba(98,76,188,0.22);
+  box-shadow: 0 8px 22px rgba(76,58,150,0.14);
+}
+.app-window .clear-files-button {
+  border-radius: 999px;
+  transition: background 160ms ease, transform 130ms cubic-bezier(0.34,1.56,0.64,1);
+}
+.app-window.dark-mode  .clear-files-button { color: #ff8d86; }
+.app-window.light-mode .clear-files-button { color: #c53030; }
+.app-window.dark-mode  .clear-files-button:hover { background: rgba(255,107,95,0.14); transform: scale(1.06); }
+.app-window.light-mode .clear-files-button:hover { background: rgba(197,48,48,0.12);  transform: scale(1.06); }
+
+/* ── Selected file tiles ────────────────────────────────────── */
+.app-window .selected-file-overlay  { margin: 1px 5px 5px 1px; }
 .app-window .selected-file-tile {
   border-radius: 16px;
   min-width: 52px;
   min-height: 52px;
   padding: 0;
+  transition: transform 160ms cubic-bezier(0.34,1.56,0.64,1);
 }
 .app-window.dark-mode .selected-file-tile {
-  background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(74, 56, 150, 0.24));
-  border: 1px solid rgba(255,255,255,0.11);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.08),
-    0 10px 18px rgba(0,0,0,0.14);
+  background: linear-gradient(180deg, rgba(255,255,255,0.11) 0%, rgba(76,58,155,0.26) 100%);
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.09), 0 8px 18px rgba(0,0,0,0.16);
 }
 .app-window.light-mode .selected-file-tile {
-  background: linear-gradient(180deg, rgba(255,255,255,0.86), rgba(219, 210, 255, 0.70));
-  border: 1px solid rgba(102, 82, 184, 0.14);
-  box-shadow: 0 10px 18px rgba(76, 58, 140, 0.10);
+  background: linear-gradient(180deg, rgba(255,255,255,0.90) 0%, rgba(218,208,255,0.74) 100%);
+  border: 1px solid rgba(104,82,183,0.16);
+  box-shadow: 0 8px 18px rgba(78,60,144,0.12);
 }
-.app-window .selected-file-tile-icon {
-  opacity: 0.95;
-}
-.app-window .selected-file-preview {
-  border-radius: 12px;
-}
+.app-window .selected-file-tile-icon { opacity: 0.95; }
+.app-window .selected-file-preview   { border-radius: 12px; }
 .app-window .selected-file-remove-badge {
-  min-width: 13px;
-  min-height: 13px;
+  min-width: 14px;
+  min-height: 14px;
   padding: 0;
   border-radius: 999px;
   margin-top: -1px;
   margin-right: -1px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+  transition: transform 130ms cubic-bezier(0.34,1.56,0.64,1), filter 120ms ease;
 }
-.app-window .selected-file-remove-badge image {
-  -gtk-icon-size: 7px;
-  opacity: 0.88;
-}
-.app-window.dark-mode .selected-file-remove-badge {
-  background: rgb(111, 0, 0);
-  border: 1px solid rgba(255,255,255,0.72);
-  color: white;
-}
-.app-window.light-mode .selected-file-remove-badge {
-  background: rgb(111, 0, 0);
-  border: 1px solid rgba(255,255,255,0.80);
-  color: white;
-}
-.app-window .selected-file-remove-badge:hover {
-  filter: brightness(1.06);
-}
-.app-window.dark-mode .send-select-button {
-  background: linear-gradient(180deg, rgba(103,80,210,0.40), rgba(73,52,160,0.26));
-  border: 1px solid rgba(255,255,255,0.10);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.10),
-    0 8px 18px rgba(0,0,0,0.20);
-}
-.app-window.light-mode .send-select-button {
-  background: linear-gradient(180deg, rgba(111,87,225,0.18), rgba(255,255,255,0.56));
-  border: 1px solid rgba(93,72,177,0.18);
-  box-shadow: 0 8px 18px rgba(76, 58, 140, 0.12);
-}
-.app-window .clear-files-button {
-  border-radius: 999px;
-}
-.app-window.dark-mode .clear-files-button {
-  color: #ff8d86;
-}
-.app-window.light-mode .clear-files-button {
-  color: #d85663;
-}
-.app-window.dark-mode .clear-files-button:hover {
-  background: rgba(255, 107, 95, 0.12);
-}
-.app-window.light-mode .clear-files-button:hover {
-  background: rgba(216, 86, 99, 0.12);
-}
+.app-window .selected-file-remove-badge image { -gtk-icon-size: 7px; opacity: 0.90; }
+.app-window .selected-file-remove-badge:hover { transform: scale(1.14); filter: brightness(1.12); }
+.app-window.dark-mode  .selected-file-remove-badge { background: rgb(185,28,28);  border: 1px solid rgba(255,255,255,0.72); color: white; }
+.app-window.light-mode .selected-file-remove-badge { background: rgb(185,28,28);  border: 1px solid rgba(255,255,255,0.80); color: white; }
+
+/* ── Devices Card ───────────────────────────────────────────── */
 .app-window .devices-card {
   padding: 14px 14px 10px 14px;
-  border-radius: 18px;
+  border-radius: 20px;
 }
 .app-window .network-summary-card {
   border-radius: 14px;
-  padding: 10px 12px;
+  padding: 10px 14px;
   margin-top: 2px;
   margin-bottom: 2px;
 }
 .app-window.dark-mode .network-summary-card {
-  background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(65, 49, 132, 0.14));
-  border: 1px solid rgba(255,255,255,0.08);
+  background: linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(58,44,118,0.12) 100%);
+  border: 1px solid rgba(255,255,255,0.07);
 }
 .app-window.light-mode .network-summary-card {
-  background: linear-gradient(180deg, rgba(255,255,255,0.70), rgba(226, 218, 255, 0.86));
-  border: 1px solid rgba(107, 86, 195, 0.14);
+  background: linear-gradient(180deg, rgba(255,255,255,0.76) 0%, rgba(224,214,255,0.90) 100%);
+  border: 1px solid rgba(108,87,198,0.13);
 }
-.app-window .network-summary-title {
-  font-size: 0.88em;
-  font-weight: 700;
-  opacity: 0.82;
-}
-.app-window .network-summary-subtitle {
-  font-size: 0.88em;
-  opacity: 0.84;
-}
-.app-window .history-list {
-  margin-top: 0;
-}
+.app-window .network-summary-title    { font-size: 0.87em; font-weight: 700; opacity: 0.80; }
+.app-window .network-summary-subtitle { font-size: 0.87em; opacity: 0.82; }
+
+/* ── History ────────────────────────────────────────────────── */
+.app-window .history-list { margin-top: 0; }
 .app-window .history-button {
   border-radius: 999px;
-  padding: 4px 10px;
+  padding: 4px 12px;
   font-size: 0.88em;
   font-weight: 700;
+  transition: transform 130ms cubic-bezier(0.34,1.56,0.64,1), box-shadow 160ms ease;
 }
-.app-window .history-popover contents {
-  padding: 10px;
-  border-radius: 16px;
-}
-.app-window .history-title {
-  font-weight: 700;
-  font-size: 0.96em;
-}
-.app-window .history-subtitle {
-  opacity: 0.72;
-  font-size: 0.88em;
-}
+.app-window .history-button:hover { transform: translateY(-1px); }
+.app-window .history-title    { font-weight: 700; font-size: 0.96em; }
+.app-window .history-subtitle { opacity: 0.70; font-size: 0.87em; }
 .app-window .history-icon-button {
   border-radius: 999px;
   min-width: 32px;
   min-height: 32px;
   padding: 0;
+  transition: transform 130ms cubic-bezier(0.34,1.56,0.64,1);
 }
+.app-window .history-icon-button:hover { transform: scale(1.10); }
 .app-window .boxed-list row.history-row {
   border-radius: 14px;
+  transition: background 150ms ease;
 }
 .app-window.dark-mode .boxed-list row.history-row {
-  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(62, 47, 128, 0.14));
+  background: linear-gradient(180deg, rgba(255,255,255,0.07) 0%, rgba(56,42,118,0.14) 100%);
   border: 1px solid rgba(255,255,255,0.06);
 }
 .app-window.light-mode .boxed-list row.history-row {
-  background: linear-gradient(180deg, rgba(255,255,255,0.82), rgba(229, 221, 255, 0.70));
-  border: 1px solid rgba(107, 86, 195, 0.10);
+  background: linear-gradient(180deg, rgba(255,255,255,0.84) 0%, rgba(228,220,255,0.74) 100%);
+  border: 1px solid rgba(108,87,198,0.11);
 }
+
+/* ── Caption & section headings ─────────────────────────────── */
 .app-window .caption-heading {
   letter-spacing: 0.02em;
-  text-transform: none;
-  font-size: 0.94em;
-  opacity: 0.74;
+  font-size: 0.92em;
   font-weight: 700;
+  opacity: 0.72;
   margin-top: 6px;
   margin-bottom: 6px;
 }
-.app-window.dark-mode .boxed-list row:hover {
-  background: color-mix(in srgb, #ffffff 8%, transparent);
-}
-.app-window.light-mode .boxed-list row:hover {
-  background: color-mix(in srgb, #5f4bb6 10%, white);
-}
 
+/* ── Generic row hover ──────────────────────────────────────── */
+.app-window.dark-mode  .boxed-list row:hover { background: color-mix(in srgb, #ffffff 7%, transparent); }
+.app-window.light-mode .boxed-list row:hover { background: color-mix(in srgb, #5e4ab5 9%, white); }
+
+/* ── Transfer states ────────────────────────────────────────── */
 .app-window .boxed-list row.transfer-row.transfer-active {
-  background: color-mix(in srgb, #60a5fa 10%, transparent);
+  background: color-mix(in srgb, #5b8ef8 12%, transparent);
   border-radius: 14px;
+  border: 1px solid color-mix(in srgb, #93bafd 15%, transparent);
 }
-
 .app-window .boxed-list row.transfer-row.transfer-success {
-  background: color-mix(in srgb, #22c55e 18%, transparent);
+  background: color-mix(in srgb, #22c55e 16%, transparent);
   border-radius: 14px;
-  border: 1px solid color-mix(in srgb, #86efac 26%, transparent);
+  border: 1px solid color-mix(in srgb, #86efac 24%, transparent);
 }
-
 .app-window .boxed-list row.transfer-row.transfer-success:hover {
-  background: color-mix(in srgb, #22c55e 24%, transparent);
+  background: color-mix(in srgb, #22c55e 22%, transparent);
 }
-
 .app-window .boxed-list row.transfer-row.transfer-error {
-  background: color-mix(in srgb, #ef4444 16%, transparent);
+  background: color-mix(in srgb, #ef4444 14%, transparent);
   border-radius: 14px;
-  border: 1px solid color-mix(in srgb, #fca5a5 24%, transparent);
+  border: 1px solid color-mix(in srgb, #fca5a5 22%, transparent);
 }
-
 .app-window .boxed-list row.transfer-row.transfer-error:hover {
-  background: color-mix(in srgb, #ef4444 22%, transparent);
+  background: color-mix(in srgb, #ef4444 20%, transparent);
 }
 
+/* ── Progress bar ───────────────────────────────────────────── */
+.app-window progressbar { border-radius: 6px; }
+.app-window progressbar trough {
+  background: rgba(255,255,255,0.11);
+  border-radius: 6px;
+  min-height: 5px;
+  border: none;
+  box-shadow: none;
+}
+.app-window.light-mode progressbar trough {
+  background: rgba(0,0,0,0.08);
+}
+.app-window progressbar trough progress {
+  background: linear-gradient(90deg, #7c52f0, #4ac5f5);
+  border-radius: 6px;
+  border: none;
+  box-shadow: 0 0 8px rgba(122,82,240,0.42);
+  transition: min-width 120ms ease;
+}
+
+/* ── PIN badge ──────────────────────────────────────────────── */
 .app-window .pin-badge {
-  font-size: 0.84em;
+  font-size: 0.83em;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  padding: 4px 10px;
+  letter-spacing: 0.08em;
+  padding: 4px 11px;
   border-radius: 999px;
 }
-
 .app-window.dark-mode .pin-badge {
-  color: #efe9ff;
-  background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(139, 92, 246, 0.18));
-  border: 1px solid rgba(255,255,255,0.12);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.10),
-    0 6px 14px rgba(16, 8, 44, 0.22);
+  color: #eee8ff;
+  background: linear-gradient(180deg, rgba(255,255,255,0.14) 0%, rgba(142,98,250,0.20) 100%);
+  border: 1px solid rgba(255,255,255,0.14);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 4px 12px rgba(18,9,50,0.26);
 }
-
 .app-window.light-mode .pin-badge {
-  color: #49357f;
-  background: linear-gradient(180deg, rgba(255,255,255,0.86), rgba(192, 180, 255, 0.55));
-  border: 1px solid rgba(107, 86, 195, 0.16);
-  box-shadow: 0 6px 14px rgba(76, 58, 140, 0.10);
+  color: #3c2870;
+  background: linear-gradient(180deg, rgba(255,255,255,0.90) 0%, rgba(194,180,255,0.60) 100%);
+  border: 1px solid rgba(108,88,198,0.18);
+  box-shadow: 0 4px 12px rgba(78,58,144,0.12);
 }
 
+/* ── Visibility icons ───────────────────────────────────────── */
 .app-window .visibility-visible {
-  color: #5eead4;
+  color: #4de8c2;
   -gtk-icon-shadow:
-    0 0 10px rgba(94, 234, 212, 0.85),
-    0 0 18px rgba(94, 234, 212, 0.55),
-    0 0 28px rgba(94, 234, 212, 0.30);
+    0 0 8px  rgba(77,232,194,0.95),
+    0 0 18px rgba(77,232,194,0.62),
+    0 0 32px rgba(77,232,194,0.34);
 }
-
 .app-window .visibility-hidden {
   color: #f87171;
   -gtk-icon-shadow:
-    0 0 10px rgba(248, 113, 113, 0.75),
-    0 0 18px rgba(248, 113, 113, 0.45),
-    0 0 28px rgba(248, 113, 113, 0.24);
+    0 0 8px  rgba(248,113,113,0.85),
+    0 0 18px rgba(248,113,113,0.50),
+    0 0 28px rgba(248,113,113,0.26);
 }
+.app-window .visibility-temporary { color: #cbd5e1; }
 
-.app-window .visibility-temporary {
-  color: #cbd5e1;
-}
+/* ── Status page ────────────────────────────────────────────── */
+.app-window.dark-mode  .status-page { color: #d6d0ff; }
+.app-window.light-mode .status-page { color: #4a3e72; }
 
-.app-window.dark-mode .status-page {
-  color: #d9d2ff;
-}
-.app-window.light-mode .status-page {
-  color: #4b3f72;
-}
-
+/* ── Pill Switcher ──────────────────────────────────────────── */
 .app-window.dark-mode .pill-switcher {
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.12), rgba(67,49,140,0.24));
+  background: linear-gradient(180deg, rgba(255,255,255,0.11) 0%, rgba(58,44,128,0.22) 100%);
   border-radius: 16px;
   padding: 2px;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.10),
-    inset 0 -1px 0 rgba(0,0,0,0.12),
-    0 18px 38px rgba(0,0,0,0.36);
-  border: 1px solid rgba(255,255,255,0.12);
+    inset 0 -1px 0 rgba(0,0,0,0.14),
+    0 16px 38px rgba(0,0,0,0.40);
+  border: 1px solid rgba(255,255,255,0.11);
   outline: 1px solid transparent;
 }
 .app-window.light-mode .pill-switcher {
-  background: linear-gradient(180deg, rgba(82,56,184,0.14), rgba(255,255,255,0.5));
+  background: linear-gradient(180deg, rgba(86,62,192,0.16) 0%, rgba(255,255,255,0.56) 100%);
   border-radius: 12px;
   padding: 2px;
-  box-shadow: 0 10px 26px rgba(69, 46, 146, 0.18);
-  border: 1px solid rgba(93, 72, 177, 0.16);
+  box-shadow: 0 10px 28px rgba(72,48,154,0.20);
+  border: 1px solid rgba(98,76,183,0.16);
   outline: 1px solid transparent;
 }
-.app-window .pill-switcher .viewswitcher {
-  background: transparent;
-}
+.app-window .pill-switcher .viewswitcher { background: transparent; }
 .app-window .pill-switcher .viewswitcher button {
   min-height: 32px;
   min-width: 84px;
   padding: 6px 10px;
-  border-radius: 9px;
+  border-radius: 10px;
   box-shadow: none;
   border: none;
   outline: none;
+  transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease;
 }
 .app-window .pill-switcher .viewswitcher button:focus,
 .app-window .pill-switcher .viewswitcher button:focus-visible,
-.app-window .pill-switcher .viewswitcher button:focus-within {
-  outline: none;
-  box-shadow: none;
-}
-.app-window.dark-mode .pill-switcher .viewswitcher button {
-  color: rgba(255,255,255,0.78);
-}
-.app-window.light-mode .pill-switcher .viewswitcher button {
-  color: rgba(45, 30, 94, 0.84);
-}
-.app-window.dark-mode .pill-switcher .viewswitcher button:hover {
-  background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04));
+.app-window .pill-switcher .viewswitcher button:focus-within { outline: none; box-shadow: none; }
+.app-window.dark-mode  .pill-switcher .viewswitcher button { color: rgba(255,255,255,0.72); }
+.app-window.light-mode .pill-switcher .viewswitcher button { color: rgba(36,24,90,0.80); }
+.app-window.dark-mode  .pill-switcher .viewswitcher button:hover {
+  background: linear-gradient(180deg, rgba(255,255,255,0.11) 0%, rgba(255,255,255,0.04) 100%);
+  color: rgba(255,255,255,0.92);
 }
 .app-window.light-mode .pill-switcher .viewswitcher button:hover {
-  background: linear-gradient(180deg, rgba(93,72,177,0.10), rgba(255,255,255,0.34));
+  background: linear-gradient(180deg, rgba(98,76,188,0.12) 0%, rgba(255,255,255,0.36) 100%);
+  color: rgba(36,24,90,1.0);
 }
 .app-window.dark-mode .pill-switcher .viewswitcher button:checked {
-  background: linear-gradient(180deg, rgba(103,80,210,0.90), rgba(73,52,160,0.92));
+  background: linear-gradient(165deg, rgba(115,88,228,0.96) 0%, rgba(77,54,168,0.98) 100%);
   color: #fff;
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.14),
+    inset 0 1px 0 rgba(255,255,255,0.18),
     inset 0 -1px 0 rgba(0,0,0,0.16),
-    0 6px 14px rgba(90,61,189,0.22);
+    0 4px 14px rgba(88,62,192,0.32);
 }
 .app-window.light-mode .pill-switcher .viewswitcher button:checked {
-  background: linear-gradient(180deg, rgba(111,87,225,0.88), rgba(77,55,171,0.92));
+  background: linear-gradient(165deg, rgba(115,88,228,0.92) 0%, rgba(77,54,168,0.96) 100%);
   color: #fff;
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.22),
+    inset 0 1px 0 rgba(255,255,255,0.28),
     inset 0 -1px 0 rgba(0,0,0,0.08),
-    0 8px 18px rgba(90,61,189,0.20);
+    0 6px 18px rgba(88,62,192,0.28);
 }
-.app-window .pill-switcher .viewswitcher button label {
-  font-size: 1.0em;
-  font-weight: 600;
-}
+.app-window .pill-switcher .viewswitcher button label { font-size: 1.0em; font-weight: 600; }
+
+/* ── Device Tiles ───────────────────────────────────────────── */
 .app-window.dark-mode .device-tile {
   padding: 0;
-  background: linear-gradient(180deg, rgba(90, 71, 164, 0.34), rgba(55, 41, 112, 0.28));
-  border-radius: 14px;
-  border: 1px solid rgba(255,255,255,0.08);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.06),
-    0 10px 24px rgba(0,0,0,0.22);
+  background: linear-gradient(155deg, rgba(96,74,182,0.32) 0%, rgba(53,40,112,0.26) 100%);
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.09);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 26px rgba(0,0,0,0.26);
+  transition:
+    background 200ms ease,
+    box-shadow 220ms ease,
+    transform  200ms cubic-bezier(0.34,1.56,0.64,1),
+    border-color 200ms ease;
 }
 .app-window.dark-mode .device-tile:hover {
-  background: linear-gradient(180deg, rgba(102, 80, 183, 0.38), rgba(61, 47, 124, 0.32));
+  background: linear-gradient(155deg, rgba(118,92,210,0.42) 0%, rgba(66,50,136,0.36) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.13),
+    0 18px 44px rgba(0,0,0,0.32),
+    0 0 0 1px rgba(255,255,255,0.11);
+  transform: translateY(-3px);
 }
+.app-window.dark-mode .device-tile:active { transform: translateY(-1px); }
 .app-window.light-mode .device-tile {
   padding: 0;
-  background: linear-gradient(180deg, rgba(255,255,255,0.72), rgba(241,236,255,0.92));
-  color: #2e2357;
-  border-radius: 14px;
-  border: 1px solid rgba(110, 87, 184, 0.14);
-  box-shadow: 0 10px 24px rgba(76, 58, 140, 0.14);
+  background: linear-gradient(155deg, rgba(255,255,255,0.78) 0%, rgba(236,230,255,0.94) 100%);
+  color: #281e56;
+  border-radius: 16px;
+  border: 1px solid rgba(112,90,190,0.17);
+  box-shadow: 0 8px 26px rgba(78,58,144,0.15);
+  transition:
+    background 200ms ease,
+    box-shadow 220ms ease,
+    transform  200ms cubic-bezier(0.34,1.56,0.64,1);
 }
 .app-window.light-mode .device-tile:hover {
-  background: linear-gradient(180deg, rgba(255,255,255,0.86), rgba(236,230,255,0.98));
+  background: linear-gradient(155deg, rgba(255,255,255,0.92) 0%, rgba(246,242,255,0.99) 100%);
+  box-shadow: 0 20px 44px rgba(78,58,144,0.22);
+  transform: translateY(-3px);
 }
+.app-window.light-mode .device-tile:active { transform: translateY(-1px); }
 .app-window.light-mode .device-tile image,
-.app-window.light-mode .device-tile label {
-  color: #2e2357;
+.app-window.light-mode .device-tile label { color: #281e56; }
+.app-window.dark-mode  .device-tile image,
+.app-window.dark-mode  .device-tile label { color: #f0ecff; }
+
+/* icon circle background */
+.app-window.dark-mode .device-icon-circle {
+  background: linear-gradient(145deg, rgba(255,255,255,0.10) 0%, rgba(80,60,178,0.20) 100%);
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.10);
 }
-.app-window.dark-mode .device-tile image,
-.app-window.dark-mode .device-tile label {
-  color: #f0ebff;
+.app-window.light-mode .device-icon-circle {
+  background: linear-gradient(145deg, rgba(255,255,255,0.82) 0%, rgba(210,194,255,0.62) 100%);
+  border-radius: 999px;
+  border: 1px solid rgba(138,110,210,0.15);
 }
-.app-window .device-tile-title {
-  font-weight: 700;
-}
-.app-window .device-tile-meta {
-  font-size: 0.80em;
-  opacity: 0.72;
-}
+
+.app-window .device-tile-title { font-weight: 700; letter-spacing: -0.01em; }
+.app-window .device-tile-meta  { font-size: 0.80em; opacity: 0.68; }
 .app-window .device-transport-badge {
-  padding: 3px 8px;
+  padding: 3px 9px;
   border-radius: 999px;
   font-size: 0.76em;
   font-weight: 700;
   letter-spacing: 0.02em;
 }
-.app-window.dark-mode .transport-wifi {
-  background: rgba(94, 234, 212, 0.12);
-  color: #8ef3e5;
-  border: 1px solid rgba(94, 234, 212, 0.20);
-}
-.app-window.light-mode .transport-wifi {
-  background: rgba(63, 188, 166, 0.12);
-  color: #197b6e;
-  border: 1px solid rgba(63, 188, 166, 0.18);
-}
-.app-window.dark-mode .transport-wifi-direct {
-  background: rgba(96, 165, 250, 0.12);
-  color: #a7d0ff;
-  border: 1px solid rgba(96, 165, 250, 0.20);
-}
-.app-window.light-mode .transport-wifi-direct {
-  background: rgba(86, 118, 235, 0.12);
-  color: #3651a8;
-  border: 1px solid rgba(86, 118, 235, 0.18);
-}
+.app-window.dark-mode  .transport-wifi         { background: rgba(77,232,194,0.12);  color: #80f5e0; border: 1px solid rgba(77,232,194,0.22); }
+.app-window.light-mode .transport-wifi         { background: rgba(20,158,128,0.10);  color: #0f7c65; border: 1px solid rgba(20,158,128,0.18); }
+.app-window.dark-mode  .transport-wifi-direct  { background: rgba(96,165,250,0.12);  color: #aaceff; border: 1px solid rgba(96,165,250,0.22); }
+.app-window.light-mode .transport-wifi-direct  { background: rgba(64,108,225,0.10);  color: #2a4ea0; border: 1px solid rgba(64,108,225,0.18); }
 "#
     .replace("__FONT_SIZE_PX__", &font_size_px.to_string());
 
