@@ -10,6 +10,15 @@ pub fn build_pulse_placeholder(
     description: Option<&str>,
     compact: bool,
 ) -> gtk4::Box {
+    build_pulse_placeholder_sized(title, description, compact, None)
+}
+
+pub fn build_pulse_placeholder_sized(
+    title: Option<&str>,
+    description: Option<&str>,
+    compact: bool,
+    size_override: Option<i32>,
+) -> gtk4::Box {
     let root = gtk4::Box::new(gtk4::Orientation::Vertical, if compact { 10 } else { 18 });
     root.set_hexpand(true);
     root.set_vexpand(true);
@@ -17,7 +26,8 @@ pub fn build_pulse_placeholder(
     root.set_valign(gtk4::Align::Center);
     root.add_css_class("status-page");
 
-    let pulse = PulseWidget::new(if compact { 120 } else { 180 });
+    let default_size = if compact { 120 } else { 180 };
+    let pulse = PulseWidget::new(size_override.unwrap_or(default_size));
     root.append(&pulse.area);
 
     if let Some(title) = title {
@@ -80,17 +90,26 @@ impl PulseWidget {
                 let (ambient_r, ambient_g, ambient_b, ambient_a) = if is_light {
                     (0.51, 0.43, 0.92, 0.05)
                 } else {
-                    (1.0, 1.0, 1.0, 0.06)
+                    // #6E63E8 — roxo azulado
+                    (0.431, 0.388, 0.910, 0.08)
                 };
                 let (ring_r, ring_g, ring_b, ring_alpha_scale) = if is_light {
                     (0.45, 0.37, 0.86, 0.12)
                 } else {
-                    (1.0, 1.0, 1.0, 0.18)
+                    // #A7A5FF — lilás neon
+                    (0.655, 0.647, 1.0, 0.22)
                 };
+                // #A7A5FF core em dark, roxo em light
                 let (core_r, core_g, core_b, core_a) = if is_light {
                     (0.46, 0.39, 0.88, 0.92)
                 } else {
-                    (1.0, 1.0, 1.0, 0.96)
+                    (0.655, 0.647, 1.0, 0.96)
+                };
+                // #D9D8FF — lavanda clara para as partículas
+                let (orb_r, orb_g, orb_b) = if is_light {
+                    (0.50, 0.42, 0.90)
+                } else {
+                    (0.851, 0.847, 1.000)
                 };
 
                 cr.set_source_rgba(ambient_r, ambient_g, ambient_b, ambient_a);
@@ -110,8 +129,35 @@ impl PulseWidget {
                     let _ = cr.fill();
                 }
 
+                // Orbiting signal particles (3 dots, 120° apart)
+                let orbit_r = unit * 0.295;
+                for i in 0..3usize {
+                    let angle = p * 2.0 * PI + (i as f64) * (2.0 * PI / 3.0);
+                    let px = cx + angle.cos() * orbit_r;
+                    let py = cy + angle.sin() * orbit_r;
+                    let dot_r = unit * 0.043;
+                    // Depth cue: front-hemisphere particles are brighter
+                    let depth = (angle.sin() * 0.5 + 0.5).clamp(0.0, 1.0);
+                    let dot_a = if is_light {
+                        0.28 + depth * 0.42
+                    } else {
+                        0.40 + depth * 0.44
+                    };
+                    cr.set_source_rgba(orb_r, orb_g, orb_b, dot_a);
+                    cr.arc(px, py, dot_r, 0.0, 2.0 * PI);
+                    let _ = cr.fill();
+
+                    // Short trailing dot ~18° behind
+                    let trail_angle = angle - 0.32;
+                    let tx = cx + trail_angle.cos() * orbit_r;
+                    let ty = cy + trail_angle.sin() * orbit_r;
+                    cr.set_source_rgba(orb_r, orb_g, orb_b, dot_a * 0.32);
+                    cr.arc(tx, ty, dot_r * 0.55, 0.0, 2.0 * PI);
+                    let _ = cr.fill();
+                }
+
                 cr.set_source_rgba(core_r, core_g, core_b, core_a);
-                cr.arc(cx, cy, unit * 0.12, 0.0, 2.0 * PI);
+                cr.arc(cx, cy, unit * 0.13, 0.0, 2.0 * PI);
                 let _ = cr.fill();
             });
         }
@@ -121,7 +167,7 @@ impl PulseWidget {
             let Some(area) = area_weak.upgrade() else {
                 return glib::ControlFlow::Break;
             };
-            let mut next = phase.get() + 0.0065;
+            let mut next = phase.get() + 0.0038;
             if next >= 1.0 {
                 next -= 1.0;
             }
