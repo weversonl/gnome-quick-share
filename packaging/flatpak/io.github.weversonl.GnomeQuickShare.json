@@ -1,7 +1,7 @@
 {
   "app-id": "io.github.weversonl.GnomeQuickShare",
   "runtime": "org.gnome.Platform",
-  "runtime-version": "47",
+  "runtime-version": "50",
   "sdk": "org.gnome.Sdk",
   "sdk-extensions": [
     "org.freedesktop.Sdk.Extension.rust-stable"
@@ -37,7 +37,7 @@
         {
           "type": "git",
           "url": "https://github.com/weversonl/gnome-quick-share.git",
-          "commit": "7fdacc03fddeed9f15a071c7914b613cc741c036"
+          "commit": "cabb049ba76905b1e80b523a40091a039c2877e7"
         },
         "cargo-sources.json"
       ]

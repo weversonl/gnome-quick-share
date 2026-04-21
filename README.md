@@ -156,6 +156,20 @@ ninja -C build
 meson install -C build
 ```
 
+## Uninstallation
+
+To uninstall the application and clean up system caches:
+
+```bash
+sudo ninja -C build full-uninstall
+```
+
+Or using the standard uninstall (which might not update all caches):
+
+```bash
+sudo ninja -C build uninstall
+```
+
 For a clean rebuild:
 
 ```bash

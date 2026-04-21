@@ -85,3 +85,14 @@ gnome.post_install(
   gtk_update_icon_cache: true,
   update_desktop_database: true,
 )
+
+# ── Uninstall ─────────────────────────────────────────────────────────────────
+
+run_target(
+  'full-uninstall',
+  command: [
+    files('build-aux/uninstall.sh'),
+    meson.project_build_root(),
+    get_option('prefix')
+  ]
+)

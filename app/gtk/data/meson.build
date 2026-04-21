@@ -31,7 +31,7 @@ install_data(
 
 install_data(
   'icons/128x128@2x.png',
-  install_dir: get_option('datadir') / 'icons' / 'hicolor' / '256x256@2' / 'apps',
+  install_dir: get_option('datadir') / 'icons' / 'hicolor' / '256x256@2x' / 'apps',
   rename: 'io.github.weversonl.GnomeQuickShare.png',
 )
 

@@ -60,8 +60,11 @@ DESTDIR=%{buildroot} meson install -C _build
 %{_datadir}/glib-2.0/schemas/io.github.weversonl.GnomeQuickShare.gschema.xml
 %{_datadir}/icons/hicolor/32x32/apps/io.github.weversonl.GnomeQuickShare.png
 %{_datadir}/icons/hicolor/128x128/apps/io.github.weversonl.GnomeQuickShare.png
-%{_datadir}/icons/hicolor/256x256@2/apps/io.github.weversonl.GnomeQuickShare.png
+%{_datadir}/icons/hicolor/256x256@2x/apps/io.github.weversonl.GnomeQuickShare.png
 %{_datadir}/icons/hicolor/32x32/apps/io.github.weversonl.GnomeQuickShare-symbolic.png
 %{_datadir}/icons/hicolor/scalable/actions/io.github.weversonl.GnomeQuickShare-airdrop-symbolic.svg
+%{_datadir}/icons/hicolor/scalable/actions/io.github.weversonl.GnomeQuickShare-receive-symbolic.svg
+%{_datadir}/icons/hicolor/scalable/actions/io.github.weversonl.GnomeQuickShare-send-symbolic.svg
+%{_datadir}/icons/hicolor/scalable/actions/io.github.weversonl.GnomeQuickShare-upload-symbolic.svg
 %{_datadir}/icons/hicolor/scalable/status/io.github.weversonl.GnomeQuickShare-tray-symbolic.svg
 %{_datadir}/locale/pt_BR/LC_MESSAGES/gnomeqs.mo
