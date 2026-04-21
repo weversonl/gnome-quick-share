@@ -376,10 +376,19 @@ msgstr "Visível"
 msgid "Hidden"
 msgstr "Oculto"
 
+msgid "Back"
+msgstr "Voltar"
+
+msgid "Send Files"
+msgstr "Enviar arquivos"
+
 msgid "Add Files"
 msgstr "Adicionar arquivos"
 
 msgid "Selected files"
+msgstr "Arquivos selecionados"
+
+msgid "Selected Files"
 msgstr "Arquivos selecionados"
 
 msgid "Connection lost during transfer"

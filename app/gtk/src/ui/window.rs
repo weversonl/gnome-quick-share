@@ -5,21 +5,24 @@ use gtk4::gdk;
 use gtk4::prelude::*;
 use libadwaita::prelude::*;
 
-use gnomeqs_core::channel::ChannelDirection;
-use crate::bridge::ToUi;
-use crate::settings;
-use crate::state::AppState;
-use crate::tr;
 use super::cursor::set_pointer_cursor;
 use super::receive_view::ReceiveView;
 use super::send_view::SendView;
 use super::settings_window::build_settings_window;
+use crate::bridge::ToUi;
+use crate::settings;
+use crate::state::AppState;
+use crate::tr;
+use gnomeqs_core::channel::ChannelDirection;
 
 thread_local! {
     static APP_CSS_PROVIDER: RefCell<Option<gtk4::CssProvider>> = const { RefCell::new(None) };
 }
 
-pub fn build_window(app: &libadwaita::Application, state: AppState) -> libadwaita::ApplicationWindow {
+pub fn build_window(
+    app: &libadwaita::Application,
+    state: AppState,
+) -> libadwaita::ApplicationWindow {
     let (width, height, maximized) = settings::window_state();
 
     apply_custom_css();
@@ -32,6 +35,7 @@ pub fn build_window(app: &libadwaita::Application, state: AppState) -> libadwait
         win.maximize();
     }
     win.add_css_class("app-window");
+    install_responsive_classes(&win);
     sync_theme_class(&win);
     {
         let win = win.clone();
@@ -44,6 +48,18 @@ pub fn build_window(app: &libadwaita::Application, state: AppState) -> libadwait
 
     let header_bar = libadwaita::HeaderBar::new();
 
+    let back_btn = gtk4::Button::from_icon_name("go-previous-symbolic");
+    back_btn.set_tooltip_text(Some(&tr!("Back")));
+    back_btn.add_css_class("flat");
+    back_btn.add_css_class("send-back-button");
+    back_btn.set_visible(false);
+    set_pointer_cursor(&back_btn);
+    header_bar.pack_start(&back_btn);
+
+    let header_title = gtk4::Label::new(Some("GnomeQS"));
+    header_title.add_css_class("app-header-title");
+    header_bar.set_title_widget(Some(&header_title));
+
     let settings_btn = gtk4::Button::from_icon_name("preferences-system-symbolic");
     settings_btn.set_tooltip_text(Some(&tr!("Settings")));
     settings_btn.add_css_class("flat");
@@ -52,7 +68,10 @@ pub fn build_window(app: &libadwaita::Application, state: AppState) -> libadwait
 
     let stack = libadwaita::ViewStack::new();
 
-    let receive_view = Rc::new(ReceiveView::new(state.from_ui_tx.clone(), toast_overlay.clone()));
+    let receive_view = Rc::new(ReceiveView::new(
+        state.from_ui_tx.clone(),
+        toast_overlay.clone(),
+    ));
     let send_view = Rc::new(SendView::new(state.from_ui_tx.clone()));
 
     let _recv_page = stack.add_titled_with_icon(
@@ -85,7 +104,7 @@ pub fn build_window(app: &libadwaita::Application, state: AppState) -> libadwait
     {
         let inner = gtk4::Box::new(gtk4::Orientation::Horizontal, 8);
         inner.set_halign(gtk4::Align::Center);
-        let icon = gtk4::Image::from_icon_name("share-symbolic");
+        let icon = gtk4::Image::from_icon_name("io.github.weversonl.GnomeQuickShare-send-symbolic");
         icon.set_pixel_size(18);
         let lbl = gtk4::Label::new(Some(&tr!("Send")));
         lbl.add_css_class("nav-btn-label");
@@ -108,7 +127,8 @@ pub fn build_window(app: &libadwaita::Application, state: AppState) -> libadwait
     {
         let inner = gtk4::Box::new(gtk4::Orientation::Horizontal, 8);
         inner.set_halign(gtk4::Align::Center);
-        let icon = gtk4::Image::from_icon_name("folder-download-symbolic");
+        let icon =
+            gtk4::Image::from_icon_name("io.github.weversonl.GnomeQuickShare-receive-symbolic");
         icon.set_pixel_size(18);
         let lbl = gtk4::Label::new(Some(&tr!("Receive")));
         lbl.add_css_class("nav-btn-label");
@@ -125,8 +145,12 @@ pub fn build_window(app: &libadwaita::Application, state: AppState) -> libadwait
     // ── Stack + nav signal handlers ──────────────────────────────
     {
         let send_view_clone = Rc::clone(&send_view);
-        let send_nav_btn_c  = send_nav_btn.clone();
-        let recv_nav_row_c  = recv_nav_row.clone();
+        let send_nav_btn_c = send_nav_btn.clone();
+        let recv_nav_row_c = recv_nav_row.clone();
+        let nav_bar_c = nav_bar.clone();
+        let back_btn_c = back_btn.clone();
+        let settings_btn_c = settings_btn.clone();
+        let header_title_c = header_title.clone();
         let last_page: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
         let last_page_ref = Rc::clone(&last_page);
         stack.connect_visible_child_notify(move |s| {
@@ -144,12 +168,20 @@ pub fn build_window(app: &libadwaita::Application, state: AppState) -> libadwait
                 Some("send") => {
                     send_nav_btn_c.add_css_class("nav-btn-active");
                     recv_nav_row_c.remove_css_class("nav-btn-active");
+                    nav_bar_c.set_visible(false);
+                    back_btn_c.set_visible(true);
+                    settings_btn_c.set_visible(false);
+                    header_title_c.set_text(&tr!("Send Files"));
                     log::debug!("view stack changed to send");
                     send_view_clone.start_discovery();
                 }
                 _ => {
                     recv_nav_row_c.add_css_class("nav-btn-active");
                     send_nav_btn_c.remove_css_class("nav-btn-active");
+                    nav_bar_c.set_visible(true);
+                    back_btn_c.set_visible(false);
+                    settings_btn_c.set_visible(true);
+                    header_title_c.set_text("GnomeQS");
                     log::debug!("view stack changed away from send");
                     send_view_clone.stop_discovery();
                 }
@@ -170,6 +202,12 @@ pub fn build_window(app: &libadwaita::Application, state: AppState) -> libadwait
             stack.set_visible_child_name("receive");
         });
     }
+    {
+        let stack = stack.clone();
+        back_btn.connect_clicked(move |_| {
+            stack.set_visible_child_name("receive");
+        });
+    }
 
     stack.set_vexpand(true);
 
@@ -180,8 +218,8 @@ pub fn build_window(app: &libadwaita::Application, state: AppState) -> libadwait
     inner_content.append(&nav_bar);
 
     let clamp = libadwaita::Clamp::new();
-    clamp.set_maximum_size(580);
-    clamp.set_tightening_threshold(460);
+    clamp.set_maximum_size(860);
+    clamp.set_tightening_threshold(520);
     clamp.set_vexpand(true);
     clamp.set_child(Some(&inner_content));
 
@@ -224,37 +262,38 @@ pub fn build_window(app: &libadwaita::Application, state: AppState) -> libadwait
             let Some(win) = win_weak.upgrade() else { break };
 
             match msg {
-                ToUi::TransferUpdate(cm) => {
-                    match cm.direction {
-                        ChannelDirection::LibToFront => {
-                            if let Some(rtype) = &cm.rtype {
-                                use gnomeqs_core::channel::TransferType;
-                                match rtype {
-                                    TransferType::Inbound => {
-                                        if cm.state == Some(gnomeqs_core::State::WaitingForUserConsent) {
-                                            if let Some(meta) = &cm.meta {
-                                                let name = meta.source.as_ref()
-                                                    .map(|s| s.name.as_str())
-                                                    .unwrap_or("Unknown");
-                                                let app = win
-                                                    .application()
-                                                    .and_then(|a| a.downcast::<libadwaita::Application>().ok());
-                                                send_notification(app.as_ref(), name, &cm.id);
-                                            }
+                ToUi::TransferUpdate(cm) => match cm.direction {
+                    ChannelDirection::LibToFront => {
+                        if let Some(rtype) = &cm.rtype {
+                            use gnomeqs_core::channel::TransferType;
+                            match rtype {
+                                TransferType::Inbound => {
+                                    if cm.state == Some(gnomeqs_core::State::WaitingForUserConsent)
+                                    {
+                                        if let Some(meta) = &cm.meta {
+                                            let name = meta
+                                                .source
+                                                .as_ref()
+                                                .map(|s| s.name.as_str())
+                                                .unwrap_or("Unknown");
+                                            let app = win.application().and_then(|a| {
+                                                a.downcast::<libadwaita::Application>().ok()
+                                            });
+                                            send_notification(app.as_ref(), name, &cm.id);
                                         }
-                                        receive_view_clone.handle_channel_message(cm);
                                     }
-                                    TransferType::Outbound => {
-                                        send_view_clone.handle_channel_message(cm);
-                                    }
+                                    receive_view_clone.handle_channel_message(cm);
                                 }
-                            } else {
-                                receive_view_clone.handle_channel_message(cm);
+                                TransferType::Outbound => {
+                                    send_view_clone.handle_channel_message(cm);
+                                }
                             }
+                        } else {
+                            receive_view_clone.handle_channel_message(cm);
                         }
-                        ChannelDirection::FrontToLib => {}
                     }
-                }
+                    ChannelDirection::FrontToLib => {}
+                },
                 ToUi::EndpointUpdate(info) => {
                     send_view_clone.update_endpoint(info);
                 }
@@ -302,7 +341,9 @@ pub fn build_window(app: &libadwaita::Application, state: AppState) -> libadwait
     win
 }
 pub fn apply_custom_css() {
-    let Some(display) = gdk::Display::default() else { return };
+    let Some(display) = gdk::Display::default() else {
+        return;
+    };
     let font_size_px = settings::font_size_css_px();
     let css = r#"
 /* ── Window backgrounds ────────────────────────────────────── */
@@ -346,6 +387,39 @@ pub fn apply_custom_css() {
   border: none;
   box-shadow: none;
 }
+.app-window .app-header-title {
+  font-weight: 800;
+  letter-spacing: 0;
+}
+.app-window .send-back-button {
+  min-width: 34px;
+  min-height: 34px;
+  border-radius: 999px;
+  padding: 0;
+  opacity: 0.82;
+}
+.app-window .send-back-button:hover {
+  opacity: 1;
+  background: rgba(255,255,255,0.08);
+}
+
+/* ── Width buckets: compact phones, tablet/default, wide desktop ── */
+.app-window.size-compact .headerbar,
+.app-window.size-compact headerbar {
+  min-height: 42px;
+}
+.app-window.size-wide .headerbar,
+.app-window.size-wide headerbar {
+  min-height: 56px;
+}
+.app-window.size-compact .nav-send-btn,
+.app-window.size-compact .nav-recv-btn {
+  padding: 11px 16px;
+}
+.app-window.size-wide .nav-send-btn,
+.app-window.size-wide .nav-recv-btn {
+  padding: 16px 24px;
+}
 
 /* ── Glass Cards ────────────────────────────────────────────── */
 .app-window.dark-mode .glass-card,
@@ -371,19 +445,37 @@ pub fn apply_custom_css() {
 .app-window .boxed-list listitem { background: transparent; }
 
 /* ── Drop Zone ──────────────────────────────────────────────── */
+.app-window .send-drop-frame {
+  padding: 0;
+}
 .app-window .send-drop-card {
-  padding: 26px 20px;
-  border-radius: 20px;
+  padding: 20px 20px;
+  border-radius: 18px;
   transition: box-shadow 220ms ease, border-color 220ms ease;
 }
+.app-window.size-compact .send-drop-card {
+  padding: 16px 14px;
+  border-radius: 16px;
+}
+.app-window.size-wide .send-drop-card {
+  padding: 34px 34px;
+  border-radius: 24px;
+  min-height: 270px;
+}
 .app-window.dark-mode .send-drop-card {
-  background: linear-gradient(165deg, rgba(94,86,201,0.20) 0%, rgba(29,34,85,0.24) 100%);
+  background:
+    radial-gradient(ellipse 72% 54% at 18% 18%, rgba(167,165,255,0.16) 0%, transparent 70%),
+    linear-gradient(165deg, rgba(255,255,255,0.08) 0%, rgba(29,34,85,0.30) 100%);
+  border: 1px solid rgba(167,165,255,0.14);
 }
 .app-window.light-mode .send-drop-card {
-  background: linear-gradient(165deg, rgba(220,231,255,0.42) 0%, rgba(248,250,255,0.86) 100%);
+  background:
+    radial-gradient(ellipse 72% 54% at 18% 18%, rgba(207,203,255,0.28) 0%, transparent 70%),
+    linear-gradient(165deg, rgba(255,255,255,0.82) 0%, rgba(238,242,255,0.72) 100%);
+  border: 1px solid rgba(183,174,238,0.34);
 }
 .app-window .send-drop-icon {
-  opacity: 0.84;
+  opacity: 0.88;
   transition: transform 220ms cubic-bezier(0.34,1.56,0.64,1), opacity 200ms ease;
 }
 .app-window .send-drop-card.send-drop-active .send-drop-icon {
@@ -393,12 +485,12 @@ pub fn apply_custom_css() {
 .app-window .send-drop-title {
   font-size: 1.12em;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 .app-window.dark-mode .send-drop-title { color: #F2F4FF; }
 .app-window.light-mode .send-drop-title { color: #1E2447; }
 .app-window .send-drop-subtitle { font-size: 0.95em; opacity: 0.76; }
-.app-window .send-drop-meta     { font-size: 0.84em; opacity: 0.68; }
+.app-window .send-drop-meta     { font-size: 0.86em; opacity: 0.70; }
 .app-window .send-drop-card.send-drop-active {
   border: 1.5px solid rgba(167,165,255,0.72);
   box-shadow:
@@ -410,38 +502,62 @@ pub fn apply_custom_css() {
 /* ── Select / Clear buttons ─────────────────────────────────── */
 .app-window .send-select-button {
   border-radius: 999px;
-  padding: 9px 28px;
-  font-weight: 600;
+  padding: 10px 28px;
+  font-weight: 700;
+  outline: none;
+  text-decoration: none;
+  text-shadow: none;
+  border-style: solid;
   transition: transform 130ms cubic-bezier(0.34,1.56,0.64,1), box-shadow 160ms ease, filter 140ms ease;
 }
-.app-window .send-select-button:hover  { transform: translateY(-1px); filter: brightness(1.08); }
-.app-window .send-select-button:active { transform: translateY(0px);  filter: brightness(0.94); }
+.app-window.size-compact .send-select-button {
+  padding: 8px 22px;
+}
+.app-window.size-wide .send-select-button {
+  padding: 11px 34px;
+}
+.app-window .send-select-button:hover  { transform: translateY(-1px); filter: brightness(1.08); outline: none; }
+.app-window .send-select-button:active { transform: translateY(0px);  filter: brightness(0.94); outline: none; }
 .app-window.dark-mode .send-select-button {
-  background: rgba(255,255,255,0.14);
-  border: 1.5px solid rgba(255,255,255,0.38);
-  color: #fff;
+  background: linear-gradient(180deg, rgba(242,244,255,0.98) 0%, rgba(217,216,255,0.96) 100%);
+  border: 1px solid rgba(255,255,255,0.62);
+  color: #191C45;
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.26),
-    0 0 0 3px rgba(255,255,255,0.06),
-    0 4px 16px rgba(0,0,0,0.22);
+    inset 0 1px 0 rgba(255,255,255,0.72),
+    0 0 18px rgba(217,216,255,0.55),
+    0 5px 18px rgba(0,0,0,0.28);
+}
+.app-window.dark-mode .send-select-button:hover {
+  background: linear-gradient(180deg, rgba(255,255,255,1.0) 0%, rgba(229,228,255,0.98) 100%);
+  border: 1px solid rgba(255,255,255,0.72);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.78),
+    0 0 20px rgba(217,216,255,0.60),
+    0 5px 18px rgba(0,0,0,0.30);
 }
 .app-window.light-mode .send-select-button {
-  background: rgba(255,255,255,0.90);
-  border: 1px solid #D9DFF3;
+  background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(238,242,255,0.96) 100%);
+  border: 1px solid rgba(183,174,238,0.52);
   color: #1E2447;
-  box-shadow: 0 4px 14px rgba(123,130,168,0.14);
+  box-shadow: 0 4px 18px rgba(123,130,168,0.22);
+}
+.app-window.light-mode .send-select-button:hover {
+  background: linear-gradient(180deg, rgba(255,255,255,1.0) 0%, rgba(246,248,255,0.98) 100%);
+  border: 1px solid rgba(183,174,238,0.64);
+  box-shadow: 0 5px 20px rgba(123,130,168,0.24);
 }
 .app-window .clear-files-button {
   border-radius: 999px;
-  min-width: 28px;
-  min-height: 28px;
+  min-width: 34px;
+  min-height: 34px;
   padding: 2px;
+  opacity: 0.78;
   transition: background 160ms ease, transform 130ms cubic-bezier(0.34,1.56,0.64,1);
 }
 .app-window.dark-mode  .clear-files-button { color: #ff8d86; }
 .app-window.light-mode .clear-files-button { color: #c53030; }
-.app-window.dark-mode  .clear-files-button:hover { background: rgba(255,107,95,0.14); transform: scale(1.06); }
-.app-window.light-mode .clear-files-button:hover { background: rgba(197,48,48,0.12);  transform: scale(1.06); }
+.app-window.dark-mode  .clear-files-button:hover { background: rgba(255,107,95,0.14); transform: scale(1.06); opacity: 1; }
+.app-window.light-mode .clear-files-button:hover { background: rgba(197,48,48,0.12);  transform: scale(1.06); opacity: 1; }
 
 /* ── Selected file tiles ────────────────────────────────────── */
 .app-window .selected-file-overlay  { margin: 1px 5px 5px 1px; }
@@ -486,7 +602,14 @@ pub fn apply_custom_css() {
 }
 
 /* ── History ────────────────────────────────────────────────── */
-.app-window .history-list { margin-top: 0; }
+.app-window .history-list {
+  margin-top: 6px;
+  background: transparent;
+}
+.app-window .history-list row {
+  background: transparent;
+  padding: 0;
+}
 .app-window .history-button {
   border-radius: 999px;
   padding: 4px 12px;
@@ -495,28 +618,67 @@ pub fn apply_custom_css() {
   transition: transform 130ms cubic-bezier(0.34,1.56,0.64,1), box-shadow 160ms ease;
 }
 .app-window .history-button:hover { transform: translateY(-1px); }
-.app-window .history-title    { font-weight: 700; font-size: 0.96em; }
+.app-window .history-title    { font-weight: 700; font-size: 0.98em; }
 .app-window .history-subtitle { opacity: 0.70; font-size: 0.87em; }
 .app-window .history-icon-button {
   border-radius: 999px;
-  min-width: 32px;
-  min-height: 32px;
+  min-width: 34px;
+  min-height: 34px;
   padding: 0;
   transition: transform 130ms cubic-bezier(0.34,1.56,0.64,1);
 }
+.app-window .history-icon-button image {
+  -gtk-icon-size: 16px;
+  opacity: 0.88;
+}
 .app-window .history-icon-button:hover { transform: scale(1.10); }
-.app-window .boxed-list row.history-row {
-  border-radius: 14px;
-  transition: background 150ms ease;
+.app-window.dark-mode .history-icon-button {
+  background: rgba(255,255,255,0.06);
+  color: #D9D8FF;
+  border: 1px solid rgba(167,165,255,0.12);
 }
-.app-window.dark-mode .boxed-list row.history-row {
-  background: linear-gradient(180deg, rgba(255,255,255,0.07) 0%, rgba(94,86,201,0.14) 100%);
-  border: 1px solid rgba(167,165,255,0.08);
+.app-window.light-mode .history-icon-button {
+  background: rgba(255,255,255,0.84);
+  color: #1E2447;
+  border: 1px solid rgba(217,223,243,0.90);
 }
-.app-window.light-mode .boxed-list row.history-row {
-  background: linear-gradient(180deg, rgba(255,255,255,0.90) 0%, rgba(242,238,255,0.76) 100%);
+.app-window .history-icon-chip {
+  border-radius: 10px;
+  min-width: 48px;
+  min-height: 48px;
+}
+.app-window.dark-mode .history-icon-chip {
+  background: rgba(94,86,201,0.28);
+  border: 1px solid rgba(167,165,255,0.16);
+}
+.app-window.light-mode .history-icon-chip {
+  background: rgba(255,255,255,0.92);
   border: 1px solid #D9DFF3;
 }
+.app-window row.history-row {
+  border-radius: 10px;
+  margin-bottom: 12px;
+  min-height: 88px;
+  transition: background 140ms ease, transform 140ms ease, box-shadow 160ms ease;
+}
+.app-window.dark-mode row.history-row {
+  background:
+    radial-gradient(ellipse 80% 90% at 10% 20%, rgba(255,255,255,0.13) 0%, transparent 70%),
+    linear-gradient(145deg, rgba(255,255,255,0.14) 0%, rgba(29,34,85,0.82) 100%);
+  border: 1px solid rgba(167,165,255,0.16);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.12),
+    0 10px 24px rgba(0,0,0,0.20);
+}
+.app-window.light-mode row.history-row {
+  background:
+    radial-gradient(ellipse 80% 90% at 10% 20%, rgba(255,255,255,0.90) 0%, transparent 70%),
+    linear-gradient(145deg, rgba(255,255,255,0.96) 0%, rgba(238,242,255,0.88) 100%);
+  border: 1px solid rgba(217,223,243,0.94);
+  box-shadow: 0 9px 22px rgba(123,130,168,0.14);
+}
+.app-window.dark-mode row.history-row:hover { transform: translateY(-1px); background: rgba(45,52,120,0.82); }
+.app-window.light-mode row.history-row:hover { transform: translateY(-1px); background: rgba(248,250,255,1.0); }
 
 /* ── Caption & section headings ─────────────────────────────── */
 .app-window .caption-heading {
@@ -682,10 +844,12 @@ pub fn apply_custom_css() {
 /* ── Device Tiles ───────────────────────────────────────────── */
 .app-window.dark-mode .device-tile {
   padding: 0;
-  background: linear-gradient(155deg, rgba(94,86,201,0.26) 0%, rgba(29,34,85,0.32) 100%);
+  background:
+    radial-gradient(ellipse 84% 70% at 16% 10%, rgba(167,165,255,0.18) 0%, transparent 74%),
+    linear-gradient(155deg, rgba(94,86,201,0.24) 0%, rgba(29,34,85,0.42) 100%);
   border-radius: 16px;
-  border: 1px solid rgba(167,165,255,0.10);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 26px rgba(0,0,0,0.36);
+  border: 1px solid rgba(167,165,255,0.16);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.10), 0 10px 28px rgba(0,0,0,0.36);
   transition:
     background 200ms ease,
     box-shadow 220ms ease,
@@ -693,7 +857,9 @@ pub fn apply_custom_css() {
     border-color 200ms ease;
 }
 .app-window.dark-mode .device-tile:hover {
-  background: linear-gradient(155deg, rgba(110,99,232,0.38) 0%, rgba(45,52,120,0.40) 100%);
+  background:
+    radial-gradient(ellipse 86% 72% at 16% 10%, rgba(167,165,255,0.26) 0%, transparent 74%),
+    linear-gradient(155deg, rgba(110,99,232,0.36) 0%, rgba(45,52,120,0.46) 100%);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.13),
     0 18px 44px rgba(0,0,0,0.42),
@@ -703,7 +869,9 @@ pub fn apply_custom_css() {
 .app-window.dark-mode .device-tile:active { transform: translateY(-1px); }
 .app-window.light-mode .device-tile {
   padding: 0;
-  background: linear-gradient(155deg, rgba(255,255,255,0.90) 0%, rgba(244,246,253,0.97) 100%);
+  background:
+    radial-gradient(ellipse 84% 70% at 16% 10%, rgba(207,203,255,0.36) 0%, transparent 74%),
+    linear-gradient(155deg, rgba(255,255,255,0.92) 0%, rgba(244,246,253,0.97) 100%);
   color: #1E2447;
   border-radius: 16px;
   border: 1px solid #D9DFF3;
@@ -742,19 +910,35 @@ pub fn apply_custom_css() {
     0 6px 18px rgba(123,130,168,0.14);
 }
 
-.app-window .device-tile-title { font-weight: 700; letter-spacing: -0.01em; }
-.app-window .device-tile-meta  { font-size: 0.80em; opacity: 0.68; }
-.app-window .device-transport-badge {
-  padding: 3px 9px;
-  border-radius: 999px;
-  font-size: 0.76em;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+.app-window .device-tile-title {
+  font-weight: 800;
+  letter-spacing: 0;
 }
-.app-window.dark-mode  .transport-wifi         { background: rgba(77,232,194,0.12);  color: #80f5e0; border: 1px solid rgba(77,232,194,0.22); }
-.app-window.light-mode .transport-wifi         { background: rgba(20,158,128,0.10);  color: #0f7c65; border: 1px solid rgba(20,158,128,0.18); }
-.app-window.dark-mode  .transport-wifi-direct  { background: rgba(96,165,250,0.12);  color: #aaceff; border: 1px solid rgba(96,165,250,0.22); }
-.app-window.light-mode .transport-wifi-direct  { background: rgba(64,108,225,0.10);  color: #2a4ea0; border: 1px solid rgba(64,108,225,0.18); }
+.app-window .device-tile-meta  { font-size: 0.80em; opacity: 0.68; }
+.app-window .device-transport-row {
+  opacity: 0.74;
+  margin-top: 0;
+}
+.app-window .device-transport-label {
+  font-size: 0.86em;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.app-window.dark-mode  .transport-wifi,
+.app-window.dark-mode  .transport-wifi image,
+.app-window.dark-mode  .transport-wifi label { color: #D9D8FF; }
+.app-window.light-mode .transport-wifi,
+.app-window.light-mode .transport-wifi image,
+.app-window.light-mode .transport-wifi label { color: rgba(30,36,71,0.72); }
+.app-window.dark-mode  .transport-wifi-direct,
+.app-window.dark-mode  .transport-wifi-direct image,
+.app-window.dark-mode  .transport-wifi-direct label { color: #80f5e0; }
+.app-window.light-mode .transport-wifi-direct,
+.app-window.light-mode .transport-wifi-direct image,
+.app-window.light-mode .transport-wifi-direct label { color: #0f7c65; }
+.app-window.size-compact .device-tile {
+  border-radius: 14px;
+}
 
 /* ── Bottom Navigation Bar ──────────────────────────────────── */
 .app-window .nav-bar { /* transparent container */ }
@@ -835,44 +1019,62 @@ pub fn apply_custom_css() {
 
 /* ── Receive ready card ─────────────────────────────────────── */
 .app-window .recv-ready-card {
-  padding: 8px 20px 28px 20px;
+  padding: 8px 18px 24px 18px;
+  border-radius: 26px;
+  border: 2px solid rgba(167,165,255,0.16);
+}
+.app-window.size-compact .recv-ready-card {
+  padding: 4px 12px 18px 12px;
   border-radius: 22px;
 }
+.app-window.size-wide .recv-ready-card {
+  padding: 18px 36px 38px 36px;
+  border-radius: 30px;
+  min-height: 390px;
+}
 .app-window.dark-mode .recv-ready-card {
-  background: linear-gradient(175deg, rgba(21,26,69,0.92) 0%, rgba(13,16,48,0.97) 100%);
-  border: 1px solid rgba(110,99,232,0.32);
+  background:
+    radial-gradient(ellipse 70% 52% at 18% 12%, rgba(167,165,255,0.08) 0%, transparent 72%),
+    linear-gradient(175deg, rgba(39,33,66,0.68) 0%, rgba(20,17,38,0.88) 100%);
   box-shadow:
-    inset 0 1px 0 rgba(167,165,255,0.08),
-    0 24px 64px rgba(0,0,0,0.64);
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 24px 64px rgba(0,0,0,0.46);
 }
 .app-window.light-mode .recv-ready-card {
-  background: linear-gradient(175deg, rgba(248,250,255,0.96) 0%, rgba(238,242,255,0.92) 100%);
-  border: 1px solid #D9DFF3;
-  box-shadow: 0 16px 48px rgba(123,130,168,0.16);
+  background:
+    radial-gradient(ellipse 70% 52% at 18% 12%, rgba(207,203,255,0.20) 0%, transparent 72%),
+    linear-gradient(175deg, rgba(248,250,255,0.96) 0%, rgba(238,242,255,0.88) 100%);
+  border: 2px solid #D9DFF3;
+  box-shadow:
+    0 16px 48px rgba(123,130,168,0.16);
 }
 .app-window .recv-ready-title-plain {
-  font-size: 2.3em;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+  font-size: 2.55em;
+  font-weight: 900;
+  letter-spacing: 0;
   line-height: 1.10;
 }
+.app-window.size-compact .recv-ready-title-plain { font-size: 2.08em; }
+.app-window.size-wide .recv-ready-title-plain { font-size: 2.9em; }
 .app-window.dark-mode  .recv-ready-title-plain { color: #F2F4FF; }
 .app-window.light-mode .recv-ready-title-plain { color: #1E2447; }
 .app-window .recv-ready-title-accent {
-  font-size: 2.3em;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+  font-size: 2.55em;
+  font-weight: 900;
+  letter-spacing: 0;
   line-height: 1.10;
 }
+.app-window.size-compact .recv-ready-title-accent { font-size: 2.08em; }
+.app-window.size-wide .recv-ready-title-accent { font-size: 2.9em; }
 .app-window.dark-mode  .recv-ready-title-accent { color: #A7A5FF; }
 .app-window.light-mode .recv-ready-title-accent { color: #5E56C9; }
 .app-window .recv-vis-indicator {
   margin-top: 2px;
 }
-.app-window .recv-vis-label { font-size: 0.88em; font-weight: 600; }
+.app-window .recv-vis-label { font-size: 0.92em; font-weight: 600; }
 .app-window .recv-vis-btn {
   border-radius: 999px;
-  padding: 6px 14px;
+  padding: 7px 15px;
   opacity: 0.80;
   transition: opacity 160ms ease, background 160ms ease, transform 130ms cubic-bezier(0.34,1.56,0.64,1);
 }
@@ -881,13 +1083,6 @@ pub fn apply_custom_css() {
 .app-window.dark-mode .recv-vis-btn:hover  { background: rgba(167,165,255,0.12); }
 .app-window.light-mode .recv-vis-btn:hover { background: rgba(207,203,255,0.32); }
 
-/* ── Send drop zone dashed border ───────────────────────────── */
-.app-window.dark-mode .send-drop-card {
-  border: 1.5px dashed rgba(167,165,255,0.28);
-}
-.app-window.light-mode .send-drop-card {
-  border: 1.5px dashed rgba(183,174,238,0.52);
-}
 .app-window .send-drop-card.send-drop-active {
   border: 1.5px solid rgba(118,194,255,0.68);
 }
@@ -905,34 +1100,76 @@ pub fn apply_custom_css() {
 
 /* ── Selected files list rows ───────────────────────────────── */
 .app-window .selected-file-row {
-  border-radius: 14px;
-  transition: background 140ms ease;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  transition: background 140ms ease, transform 140ms ease, box-shadow 160ms ease;
+}
+.app-window.size-compact .selected-file-row {
+  margin-bottom: 9px;
+}
+.app-window.size-wide .selected-file-row {
+  border-radius: 12px;
+  margin-bottom: 14px;
 }
 .app-window.dark-mode .selected-file-row {
-  background: rgba(29,34,85,0.60);
-  border: 1px solid rgba(167,165,255,0.10);
+  background:
+    radial-gradient(ellipse 80% 90% at 10% 20%, rgba(255,255,255,0.13) 0%, transparent 70%),
+    linear-gradient(145deg, rgba(255,255,255,0.14) 0%, rgba(29,34,85,0.82) 100%);
+  border: 1px solid rgba(167,165,255,0.16);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.12),
+    0 10px 24px rgba(0,0,0,0.28);
 }
 .app-window.light-mode .selected-file-row {
-  background: rgba(255,255,255,0.90);
-  border: 1px solid #D9DFF3;
+  background:
+    radial-gradient(ellipse 80% 90% at 10% 20%, rgba(255,255,255,0.90) 0%, transparent 70%),
+    linear-gradient(145deg, rgba(255,255,255,0.96) 0%, rgba(238,242,255,0.88) 100%);
+  border: 1px solid rgba(217,223,243,0.94);
+  box-shadow: 0 9px 22px rgba(123,130,168,0.16);
 }
-.app-window.dark-mode  .selected-file-row:hover { background: rgba(45,52,120,0.74); }
-.app-window.light-mode .selected-file-row:hover { background: rgba(248,250,255,1.0); }
+.app-window.dark-mode  .selected-file-row:hover { transform: translateY(-1px); background: rgba(45,52,120,0.82); }
+.app-window.light-mode .selected-file-row:hover { transform: translateY(-1px); background: rgba(248,250,255,1.0); }
+.app-window .selected-files-heading {
+  font-size: 1.1em;
+  font-weight: 800;
+}
+.app-window.size-compact .selected-files-heading { font-size: 1.0em; }
+.app-window.size-wide .selected-files-heading { font-size: 1.2em; }
 .app-window .selected-file-row-name {
   font-weight: 600;
-  font-size: 0.95em;
+  font-size: 0.98em;
 }
 .app-window .selected-file-row-size {
   font-size: 0.82em;
-  opacity: 0.58;
+  opacity: 0.64;
 }
-.app-window .selected-files-list { border-radius: 14px; }
-.app-window .selected-files-list row { margin-bottom: 4px; }
+.app-window .selected-files-list {
+  border-radius: 10px;
+  background: transparent;
+}
+.app-window .selected-files-list row {
+  background: transparent;
+  padding: 0;
+}
+.app-window .selected-file-remove-button {
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0;
+  border-radius: 999px;
+  opacity: 0.72;
+}
+.app-window .selected-file-remove-button:hover {
+  opacity: 1;
+  background: rgba(255,255,255,0.08);
+}
 "#
     .replace("__FONT_SIZE_PX__", &font_size_px.to_string());
 
     APP_CSS_PROVIDER.with(|cell| {
-        let provider = cell.borrow_mut().take().unwrap_or_else(gtk4::CssProvider::new);
+        let provider = cell
+            .borrow_mut()
+            .take()
+            .unwrap_or_else(gtk4::CssProvider::new);
         provider.load_from_string(&css);
         gtk4::style_context_add_provider_for_display(
             &display,
@@ -962,26 +1199,45 @@ fn sync_theme_class(win: &impl IsA<gtk4::Widget>) {
     }
 }
 
-fn send_notification(
-    app: Option<&libadwaita::Application>,
-    sender_name: &str,
-    transfer_id: &str,
-) {
+fn install_responsive_classes(win: &libadwaita::ApplicationWindow) {
+    let current_bucket = Rc::new(RefCell::new(String::new()));
+    let current_bucket_ref = Rc::clone(&current_bucket);
+
+    win.add_tick_callback(move |widget, _| {
+        let width = widget.width();
+        if width <= 0 {
+            return glib::ControlFlow::Continue;
+        }
+
+        let next_bucket = if width < 430 {
+            "size-compact"
+        } else if width < 760 {
+            "size-tablet"
+        } else {
+            "size-wide"
+        };
+
+        let mut current = current_bucket_ref.borrow_mut();
+        if current.as_str() != next_bucket {
+            widget.remove_css_class("size-compact");
+            widget.remove_css_class("size-tablet");
+            widget.remove_css_class("size-wide");
+            widget.add_css_class(next_bucket);
+            *current = next_bucket.to_string();
+        }
+
+        glib::ControlFlow::Continue
+    });
+}
+
+fn send_notification(app: Option<&libadwaita::Application>, sender_name: &str, transfer_id: &str) {
     let Some(app) = app else { return };
     let n = gio::Notification::new("GnomeQS");
     n.set_body(Some(&format!("{sender_name} wants to share")));
 
     let id_variant = glib::Variant::from(transfer_id);
-    n.add_button_with_target_value(
-        &tr!("Accept"),
-        "app.accept-transfer",
-        Some(&id_variant),
-    );
-    n.add_button_with_target_value(
-        &tr!("Decline"),
-        "app.reject-transfer",
-        Some(&id_variant),
-    );
+    n.add_button_with_target_value(&tr!("Accept"), "app.accept-transfer", Some(&id_variant));
+    n.add_button_with_target_value(&tr!("Decline"), "app.reject-transfer", Some(&id_variant));
 
     app.send_notification(Some(transfer_id), &n);
 }

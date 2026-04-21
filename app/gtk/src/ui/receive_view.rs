@@ -1,20 +1,20 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::cell::RefCell;
 
 use gtk4::prelude::*;
 use libadwaita::prelude::*;
 
-use gnomeqs_core::channel::{ChannelMessage, ChannelDirection};
 use gnomeqs_core::Visibility;
+use gnomeqs_core::channel::{ChannelDirection, ChannelMessage};
 
+use super::cursor::set_pointer_cursor;
+use super::pulse::build_pulse_placeholder_sized;
+use super::transfer_row::TransferRow;
 use crate::bridge::FromUi;
 use crate::settings;
 use crate::tr;
 use crate::transfer_history::{self, HistoryDirection, HistoryEntry};
-use super::cursor::set_pointer_cursor;
-use super::pulse::build_pulse_placeholder_sized;
-use super::transfer_row::TransferRow;
 
 pub struct ReceiveView {
     pub root: gtk4::Box,
@@ -38,21 +38,26 @@ impl ReceiveView {
         _toast_overlay: libadwaita::ToastOverlay,
     ) -> Self {
         let root = gtk4::Box::new(gtk4::Orientation::Vertical, 0);
+        root.add_css_class("receive-page");
+        root.set_vexpand(true);
 
         // ── Ready-to-receive card ────────────────────────────────
         let ready_card = gtk4::Box::new(gtk4::Orientation::Vertical, 0);
         ready_card.add_css_class("recv-ready-card");
         ready_card.set_vexpand(true);
-        ready_card.set_margin_top(12);
-        ready_card.set_margin_start(12);
-        ready_card.set_margin_end(12);
-        ready_card.set_margin_bottom(6);
+        ready_card.set_margin_top(34);
+        ready_card.set_margin_start(22);
+        ready_card.set_margin_end(22);
+        ready_card.set_margin_bottom(20);
 
-        let pulse = build_pulse_placeholder_sized(None, None, false, Some(240));
+        let pulse = build_pulse_placeholder_sized(None, None, false, Some(228));
+        pulse.set_margin_top(10);
+        pulse.set_margin_bottom(0);
         ready_card.append(&pulse);
 
         let title_box = gtk4::Box::new(gtk4::Orientation::Vertical, 4);
         title_box.set_halign(gtk4::Align::Center);
+        title_box.set_margin_top(-8);
         title_box.set_margin_bottom(12);
 
         let title_line1 = gtk4::Label::new(Some(&tr!("Ready to")));
@@ -73,7 +78,7 @@ impl ReceiveView {
         vis_indicator.set_halign(gtk4::Align::Center);
 
         let vis_indicator_icon = gtk4::Image::from_icon_name("eye-open-negative-filled-symbolic");
-        vis_indicator_icon.set_pixel_size(16);
+        vis_indicator_icon.set_pixel_size(20);
         let vis_indicator_label = gtk4::Label::new(None);
         vis_indicator_label.add_css_class("recv-vis-label");
         vis_indicator.append(&vis_indicator_icon);
@@ -94,8 +99,8 @@ impl ReceiveView {
             vis_btn.connect_clicked(move |_| {
                 let current = Visibility::from_raw_value(settings::get_visibility_raw() as u64);
                 let next = match current {
-                    Visibility::Visible    => Visibility::Invisible,
-                    Visibility::Invisible  => Visibility::Visible,
+                    Visibility::Visible => Visibility::Invisible,
+                    Visibility::Invisible => Visibility::Visible,
                     Visibility::Temporarily => Visibility::Visible,
                 };
                 settings::set_visibility_raw(next as i32);
@@ -105,7 +110,7 @@ impl ReceiveView {
         }
         ready_card.append(&vis_btn);
 
-        // Wrapper so the card sits at top inside the vexpand stack
+        // Wrapper so the card sits near the top like the Figma receive view.
         let empty_page = gtk4::Box::new(gtk4::Orientation::Vertical, 0);
         empty_page.set_vexpand(true);
         empty_page.append(&ready_card);
@@ -130,6 +135,7 @@ impl ReceiveView {
         let history_button = gtk4::Button::with_label(&tr!("History"));
         history_button.add_css_class("history-button");
         history_button.set_visible(false);
+        history_button.set_halign(gtk4::Align::End);
         set_pointer_cursor(&history_button);
 
         transfer_header.append(&transfers_heading);
@@ -150,7 +156,6 @@ impl ReceiveView {
         scroll.set_child(Some(&transfer_list));
 
         let recent_list = gtk4::ListBox::new();
-        recent_list.add_css_class("boxed-list");
         recent_list.add_css_class("history-list");
         recent_list.set_selection_mode(gtk4::SelectionMode::None);
         recent_list.set_margin_top(0);
@@ -168,7 +173,12 @@ impl ReceiveView {
                 history_dialog.present(Some(&window));
             });
         }
-        load_receive_history(&recent_list, &history_button, &transfer_header);
+        load_receive_history(
+            &recent_list,
+            &history_button,
+            &transfer_header,
+            &transfers_heading,
+        );
 
         let stack = gtk4::Stack::new();
         stack.set_vexpand(true);
@@ -236,7 +246,12 @@ impl ReceiveView {
                         let (title, subtitle) = row.history_snapshot();
                         let open_target = row.open_target_snapshot();
                         list.remove(&row.row);
-                        prepend_receive_history_row(&recent_list, &title, &subtitle, open_target.clone());
+                        prepend_receive_history_row(
+                            &recent_list,
+                            &title,
+                            &subtitle,
+                            open_target.clone(),
+                        );
                         transfer_history::append(HistoryEntry {
                             created_at: 0,
                             direction: HistoryDirection::Receive,
@@ -245,6 +260,7 @@ impl ReceiveView {
                             open_target,
                         });
                         history_button.set_visible(true);
+                        history_button.set_hexpand(true);
                     }
                     if map.is_empty() {
                         list.set_visible(false);
@@ -261,6 +277,7 @@ impl ReceiveView {
             self.transfer_list.append(&row.row);
             self.transfer_list.set_visible(true);
             self.transfers_heading.set_visible(true);
+            self.history_button.set_hexpand(false);
             self.transfer_header.set_visible(true);
             self.stack.set_visible_child(&self.list_scroll);
             row.update_state(&state, &meta);
@@ -326,6 +343,7 @@ fn load_receive_history(
     list: &gtk4::ListBox,
     history_button: &gtk4::Button,
     transfer_header: &gtk4::Box,
+    transfers_heading: &gtk4::Label,
 ) {
     let entries = transfer_history::load(HistoryDirection::Receive);
     for entry in entries.into_iter().rev() {
@@ -333,6 +351,8 @@ fn load_receive_history(
     }
     let has_history = list.first_child().is_some();
     history_button.set_visible(has_history);
+    history_button.set_hexpand(has_history);
+    transfers_heading.set_visible(false);
     transfer_header.set_visible(has_history);
 }
 
@@ -350,19 +370,33 @@ fn prepend_receive_history_row(
         title.to_string()
     };
 
-    let body = gtk4::Box::new(gtk4::Orientation::Horizontal, 10);
-    body.set_width_request(300);
-    body.set_margin_top(8);
-    body.set_margin_bottom(8);
-    body.set_margin_start(10);
+    let body = gtk4::Box::new(gtk4::Orientation::Horizontal, 12);
+    body.set_valign(gtk4::Align::Center);
+    body.set_size_request(-1, 68);
+    body.set_margin_top(10);
+    body.set_margin_bottom(10);
+    body.set_margin_start(12);
     body.set_margin_end(10);
 
     let icon = gtk4::Image::from_icon_name("folder-download-symbolic");
     icon.set_pixel_size(22);
-    body.append(&icon);
+    icon.set_halign(gtk4::Align::Center);
+    icon.set_valign(gtk4::Align::Center);
+    icon.set_margin_top(13);
+    icon.set_margin_bottom(13);
+    icon.set_margin_start(13);
+    icon.set_margin_end(13);
+    let icon_chip = gtk4::Box::new(gtk4::Orientation::Vertical, 0);
+    icon_chip.add_css_class("history-icon-chip");
+    icon_chip.set_valign(gtk4::Align::Center);
+    icon_chip.set_halign(gtk4::Align::Center);
+    icon_chip.set_size_request(48, 48);
+    icon_chip.append(&icon);
+    body.append(&icon_chip);
 
     let text_box = gtk4::Box::new(gtk4::Orientation::Vertical, 2);
     text_box.set_hexpand(true);
+    text_box.set_valign(gtk4::Align::Center);
 
     let title_label = gtk4::Label::new(Some(&row_title));
     title_label.add_css_class("history-title");
@@ -383,7 +417,11 @@ fn prepend_receive_history_row(
     if let Some(path) = open_target {
         let show_btn = gtk4::Button::from_icon_name("folder-open-symbolic");
         show_btn.set_tooltip_text(Some(&tr!("Show folder")));
+        show_btn.add_css_class("flat");
         show_btn.add_css_class("history-icon-button");
+        show_btn.set_halign(gtk4::Align::Center);
+        show_btn.set_valign(gtk4::Align::Center);
+        show_btn.set_size_request(34, 34);
         set_pointer_cursor(&show_btn);
         show_btn.connect_clicked(move |_| {
             let folder = std::path::Path::new(&path)

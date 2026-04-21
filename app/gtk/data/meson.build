@@ -48,6 +48,21 @@ install_data(
 )
 
 install_data(
+  'icons/hicolor/scalable/actions/io.github.weversonl.GnomeQuickShare-upload-symbolic.svg',
+  install_dir: get_option('datadir') / 'icons' / 'hicolor' / 'scalable' / 'actions',
+)
+
+install_data(
+  'icons/hicolor/scalable/actions/io.github.weversonl.GnomeQuickShare-send-symbolic.svg',
+  install_dir: get_option('datadir') / 'icons' / 'hicolor' / 'scalable' / 'actions',
+)
+
+install_data(
+  'icons/hicolor/scalable/actions/io.github.weversonl.GnomeQuickShare-receive-symbolic.svg',
+  install_dir: get_option('datadir') / 'icons' / 'hicolor' / 'scalable' / 'actions',
+)
+
+install_data(
   'icons/hicolor/scalable/status/io.github.weversonl.GnomeQuickShare-tray-symbolic.svg',
   install_dir: get_option('datadir') / 'icons' / 'hicolor' / 'scalable' / 'status',
 )

@@ -6,12 +6,11 @@ use gtk4::gdk;
 use gtk4::prelude::*;
 use libadwaita::prelude::*;
 
-use gnomeqs_core::TransferMetadata;
-use gnomeqs_core::{DeviceType, State};
-
+use super::cursor::set_pointer_cursor;
 use crate::bridge::FromUi;
 use crate::tr;
-use super::cursor::set_pointer_cursor;
+use gnomeqs_core::TransferMetadata;
+use gnomeqs_core::{DeviceType, State};
 
 pub struct TransferRow {
     pub row: libadwaita::ActionRow,
@@ -35,10 +34,7 @@ pub struct TransferRow {
 }
 
 impl TransferRow {
-    pub fn new(
-        id: String,
-        from_ui_tx: async_channel::Sender<FromUi>,
-    ) -> Self {
+    pub fn new(id: String, from_ui_tx: async_channel::Sender<FromUi>) -> Self {
         let row = libadwaita::ActionRow::new();
         row.set_activatable(false);
         row.add_css_class("transfer-row");
@@ -462,7 +458,11 @@ fn resolve_open_target(meta: &TransferMetadata) -> Option<String> {
 fn build_transfer_description(meta: &TransferMetadata) -> String {
     if let Some(files) = &meta.files {
         let count = files.len();
-        let label = if count == 1 { tr!("file") } else { tr!("files") };
+        let label = if count == 1 {
+            tr!("file")
+        } else {
+            tr!("files")
+        };
         format!("{} {count} {label}", tr!("Wants to share"))
     } else if meta.text_payload.is_some() {
         format!("{} {}", tr!("Wants to share"), tr!("text"))

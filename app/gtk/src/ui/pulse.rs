@@ -138,7 +138,11 @@ impl PulseWidget {
                     let dot_r = unit * 0.043;
                     // Depth cue: front-hemisphere particles are brighter
                     let depth = (angle.sin() * 0.5 + 0.5).clamp(0.0, 1.0);
-                    let dot_a = if is_light { 0.28 + depth * 0.42 } else { 0.40 + depth * 0.44 };
+                    let dot_a = if is_light {
+                        0.28 + depth * 0.42
+                    } else {
+                        0.40 + depth * 0.44
+                    };
                     cr.set_source_rgba(orb_r, orb_g, orb_b, dot_a);
                     cr.arc(px, py, dot_r, 0.0, 2.0 * PI);
                     let _ = cr.fill();
@@ -163,7 +167,7 @@ impl PulseWidget {
             let Some(area) = area_weak.upgrade() else {
                 return glib::ControlFlow::Break;
             };
-            let mut next = phase.get() + 0.0065;
+            let mut next = phase.get() + 0.0038;
             if next >= 1.0 {
                 next -= 1.0;
             }
