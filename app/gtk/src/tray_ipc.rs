@@ -1,6 +1,6 @@
 use std::env;
 use std::fs;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -16,11 +16,21 @@ pub const SOCKET_ENV: &str = "GNOMEQS_TRAY_SOCKET";
 pub const STATUS_ENV: &str = "GNOMEQS_TRAY_STATUS";
 pub const LANG_ENV: &str = "GNOMEQS_TRAY_LANG";
 pub const MONO_ENV: &str = "GNOMEQS_TRAY_MONO";
+pub const TOKEN_ENV: &str = "GNOMEQS_TRAY_TOKEN";
+
+fn gen_tray_token() -> String {
+    let mut buf = [0u8; 16];
+    if let Ok(mut f) = std::fs::File::open("/dev/urandom") {
+        let _ = f.read_exact(&mut buf);
+    }
+    buf.iter().map(|b| format!("{:02x}", b)).collect()
+}
 
 #[derive(Clone)]
 pub struct TrayHandle {
     pub socket_path: PathBuf,
     pub status_path: PathBuf,
+    pub token: String,
 }
 
 impl TrayHandle {
@@ -31,7 +41,7 @@ impl TrayHandle {
     }
 
     pub fn shutdown(&self) {
-        let _ = send_command(&self.socket_path, "shutdown");
+        let _ = send_command(&self.socket_path, &self.token, "shutdown");
         let _ = fs::remove_file(&self.socket_path);
         let _ = fs::remove_file(&self.status_path);
     }
@@ -85,7 +95,7 @@ pub fn initialize_tray_runtime() -> Option<TrayHandle> {
         }
     };
 
-    let mut spawn = if tray_exe.exists() {
+    let mut spawn = if tray_exe.exists() && cfg!(not(debug_assertions)) {
         Command::new(tray_exe)
     } else {
         let workspace_root =
@@ -99,11 +109,14 @@ pub fn initialize_tray_runtime() -> Option<TrayHandle> {
         cmd
     };
 
+    let token = gen_tray_token();
+
     if let Err(e) = spawn
         .env(SOCKET_ENV, &socket_path)
         .env(STATUS_ENV, &status_path)
         .env(LANG_ENV, helper_lang)
         .env(MONO_ENV, helper_mono)
+        .env(TOKEN_ENV, &token)
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
@@ -115,11 +128,21 @@ pub fn initialize_tray_runtime() -> Option<TrayHandle> {
     Some(TrayHandle {
         socket_path,
         status_path,
+        token,
     })
 }
 
-pub fn handle_ipc_command(cmd: &str, from_ui_tx: &async_channel::Sender<FromUi>) {
-    match cmd.trim() {
+pub fn handle_ipc_command(raw: &str, expected_token: &str, from_ui_tx: &async_channel::Sender<FromUi>) {
+    let raw = raw.trim();
+    let cmd = match raw.strip_prefix(expected_token).and_then(|s| s.strip_prefix(':')) {
+        Some(c) => c.trim(),
+        None => {
+            log::warn!("tray ipc: rejected command with invalid token");
+            return;
+        }
+    };
+
+    match cmd {
         "show" => {
             let _ = from_ui_tx.try_send(FromUi::ShowWindow);
         }
@@ -139,8 +162,10 @@ pub fn handle_ipc_command(cmd: &str, from_ui_tx: &async_channel::Sender<FromUi>)
     }
 }
 
-pub fn send_command(socket_path: &Path, cmd: &str) -> std::io::Result<()> {
+pub fn send_command(socket_path: &Path, token: &str, cmd: &str) -> std::io::Result<()> {
     let mut stream = UnixStream::connect(socket_path)?;
+    stream.write_all(token.as_bytes())?;
+    stream.write_all(b":")?;
     stream.write_all(cmd.as_bytes())?;
     stream.write_all(b"\n")?;
     stream.flush()?;

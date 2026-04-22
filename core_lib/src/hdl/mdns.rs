@@ -28,7 +28,7 @@ impl Visibility {
             0 => Visibility::Visible,
             1 => Visibility::Invisible,
             2 => Visibility::Temporarily,
-            _ => unreachable!(),
+            _ => Visibility::Invisible,
         }
     }
 }

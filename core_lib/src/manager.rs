@@ -79,6 +79,14 @@ impl TcpServer {
                     match r {
                         Ok((socket, remote_addr)) => {
                             trace!("{INNER_NAME}: new client: {remote_addr}");
+                            if let std::net::SocketAddr::V4(v4) = remote_addr {
+                                let ip = v4.ip();
+                                if !ip.is_private() && !ip.is_loopback() && !ip.is_link_local() {
+                                    debug!("{INNER_NAME}: rejecting non-LAN client: {remote_addr}");
+                                    drop(socket);
+                                    continue;
+                                }
+                            }
                             if *self.visibility_receiver.borrow() == Visibility::Invisible {
                                 debug!("{INNER_NAME}: rejecting inbound client while hidden");
                                 drop(socket);

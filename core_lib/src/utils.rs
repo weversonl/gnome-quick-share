@@ -1,5 +1,5 @@
 use std::net::Ipv4Addr;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use anyhow::anyhow;
 use base64::Engine;
@@ -193,7 +193,7 @@ pub fn get_download_dir() -> PathBuf {
         return user_dirs.home_dir().to_path_buf();
     }
 
-    Path::new("/").to_path_buf()
+    std::env::var("HOME").map(PathBuf::from).unwrap_or_else(|_| PathBuf::from("/tmp"))
 }
 
 pub fn is_not_self_ip(ip_address: &Ipv4Addr) -> bool {

@@ -10,6 +10,7 @@ const SOCKET_ENV: &str = "GNOMEQS_TRAY_SOCKET";
 const STATUS_ENV: &str = "GNOMEQS_TRAY_STATUS";
 const LANG_ENV: &str = "GNOMEQS_TRAY_LANG";
 const MONO_ENV: &str = "GNOMEQS_TRAY_MONO";
+const TOKEN_ENV: &str = "GNOMEQS_TRAY_TOKEN";
 const TRAY_ICON: &str = "io.github.weversonl.GnomeQuickShare-airdrop-symbolic";
 const TRAY_ICON_DARK: &str = "io.github.weversonl.GnomeQuickShare-tray-dark-symbolic";
 const TRAY_ICON_LIGHT: &str = "io.github.weversonl.GnomeQuickShare-tray-light-symbolic";
@@ -27,6 +28,7 @@ fn main() -> anyhow::Result<()> {
 
     let socket_path = PathBuf::from(env::var(SOCKET_ENV)?);
     let status_path = PathBuf::from(env::var(STATUS_ENV)?);
+    let token = env::var(TOKEN_ENV).unwrap_or_default();
     let lang = env::var(LANG_ENV).unwrap_or_else(|_| "en".into());
     let monochrome = env::var(MONO_ENV).map(|v| v == "1").unwrap_or(false);
     let icon_theme_path = icon_theme_root();
@@ -49,8 +51,9 @@ fn main() -> anyhow::Result<()> {
     let show_item = gtk3::MenuItem::with_label(show_label);
     {
         let socket_path = socket_path.clone();
+        let token = token.clone();
         show_item.connect_activate(move |_| {
-            let _ = send_command(&socket_path, "show");
+            let _ = send_command(&socket_path, &token, "show");
         });
     }
     menu.append(&show_item);
@@ -64,8 +67,9 @@ fn main() -> anyhow::Result<()> {
     ));
     {
         let socket_path = socket_path.clone();
+        let token = token.clone();
         visibility_item.connect_activate(move |_| {
-            let _ = send_command(&socket_path, "toggle_visibility");
+            let _ = send_command(&socket_path, &token, "toggle_visibility");
         });
     }
     menu.append(&visibility_item);
@@ -75,8 +79,9 @@ fn main() -> anyhow::Result<()> {
     let quit_item = gtk3::MenuItem::with_label(quit_label);
     {
         let socket_path = socket_path.clone();
+        let token = token.clone();
         quit_item.connect_activate(move |_| {
-            let _ = send_command(&socket_path, "quit");
+            let _ = send_command(&socket_path, &token, "quit");
         });
     }
     menu.append(&quit_item);
@@ -149,11 +154,13 @@ fn tray_icon_name(monochrome: bool) -> &'static str {
     }
 }
 
-fn send_command(socket_path: &std::path::Path, cmd: &str) -> std::io::Result<()> {
+fn send_command(socket_path: &std::path::Path, token: &str, cmd: &str) -> std::io::Result<()> {
     use std::io::Write;
     use std::os::unix::net::UnixStream;
 
     let mut stream = UnixStream::connect(socket_path)?;
+    stream.write_all(token.as_bytes())?;
+    stream.write_all(b":")?;
     stream.write_all(cmd.as_bytes())?;
     stream.write_all(b"\n")?;
     stream.flush()?;

@@ -112,6 +112,7 @@ fn main() -> anyhow::Result<()> {
 
     if let Some(handle) = tray_handle.as_ref() {
         let socket_path = handle.socket_path.clone();
+        let token = handle.token.clone();
         let from_ui_tx = from_ui_tx.clone();
         rt.spawn(async move {
             let listener = match UnixListener::bind(&socket_path) {
@@ -129,7 +130,7 @@ fn main() -> anyhow::Result<()> {
                         match stream.read_to_end(&mut buf).await {
                             Ok(_) => {
                                 if let Ok(cmd) = String::from_utf8(buf) {
-                                    tray_ipc::handle_ipc_command(&cmd, &from_ui_tx);
+                                    tray_ipc::handle_ipc_command(&cmd, &token, &from_ui_tx);
                                 }
                             }
                             Err(e) => warn!("tray ipc read failed: {}", e),

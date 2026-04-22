@@ -99,7 +99,7 @@ impl InboundRequest {
                 server_seq: 0,
                 client_seq: 0,
                 state: State::Initial,
-                encryption_done: true,
+                encryption_done: false,
                 ..Default::default()
             },
             sender,
@@ -954,7 +954,7 @@ impl InboundRequest {
             .await;
         } else if introduction.text_metadata.len() == 1 {
             trace!("process_introduction: handling text_metadata");
-            let meta = introduction.text_metadata.first().unwrap();
+            let meta = introduction.text_metadata.first().ok_or_else(|| anyhow!("Missing text metadata"))?;
 
             match meta.r#type() {
                 text_metadata::Type::Url => {
@@ -1010,7 +1010,7 @@ impl InboundRequest {
             }
         } else if introduction.wifi_credentials_metadata.len() == 1 {
             trace!("process_introduction: handling wifi_credentials_metadata");
-            let meta = introduction.wifi_credentials_metadata.first().unwrap();
+            let meta = introduction.wifi_credentials_metadata.first().ok_or_else(|| anyhow!("Missing wifi credentials metadata"))?;
 
             let metadata = TransferMetadata {
                 id: self.state.id.clone(),
@@ -1178,7 +1178,9 @@ impl InboundRequest {
         }
 
         let encoded_point = EncodedPoint::from_bytes(bytes)?;
-        let peer_key = PublicKey::from_encoded_point(&encoded_point).unwrap();
+        let peer_key = PublicKey::from_encoded_point(&encoded_point)
+            .into_option()
+            .ok_or_else(|| anyhow!("Invalid peer EC public key"))?;
         let priv_key = self.state.private_key.as_ref().unwrap();
 
         let dhs = diffie_hellman(priv_key.to_nonzero_scalar(), peer_key.as_affine());
@@ -1427,6 +1429,10 @@ impl InboundRequest {
 
         for path in &self.state.completed_files {
             let Some(detection) = identify_received_file_with_magika(path) else {
+                // Magika unavailable — fall back to extension-only check (fail-closed)
+                if is_potentially_dangerous_file_name(path) {
+                    next_risk = TransferRiskLevel::Extension;
+                }
                 continue;
             };
             let extension_risk = is_potentially_dangerous_file_name(path);
