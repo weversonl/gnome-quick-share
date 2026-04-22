@@ -383,6 +383,38 @@ fn build_history_group(
         .build();
     group.add(&max_items_row);
 
+    let save_history = libadwaita::SwitchRow::new();
+    save_history.set_title(&tr!("Save transfer history"));
+    save_history.set_subtitle(&tr!("Store sent and received transfer names locally."));
+    save_history.set_active(settings::get_save_transfer_history());
+    set_pointer_cursor(&save_history);
+    {
+        let win = win.clone();
+        let on_history_cleared = Rc::clone(on_history_cleared);
+        save_history.connect_active_notify(move |row| {
+            let enabled = row.is_active();
+            let _ = settings().set_boolean("save-transfer-history", enabled);
+
+            if enabled {
+                return;
+            }
+
+            match transfer_history::clear() {
+                Ok(()) => {
+                    on_history_cleared();
+                    win.add_toast(libadwaita::Toast::new(&tr!("Transfer history cleared")));
+                }
+                Err(e) => {
+                    log::warn!("failed to clear transfer history after disabling history: {e}");
+                    win.add_toast(libadwaita::Toast::new(&tr!(
+                        "Could not clear transfer history"
+                    )));
+                }
+            }
+        });
+    }
+    group.add(&save_history);
+
     let clear_row = libadwaita::ActionRow::new();
     clear_row.set_title(&tr!("Clear transfer history"));
     clear_row.set_subtitle(&tr!(

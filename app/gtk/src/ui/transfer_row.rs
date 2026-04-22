@@ -9,12 +9,13 @@ use libadwaita::prelude::*;
 use super::cursor::set_pointer_cursor;
 use crate::bridge::FromUi;
 use crate::tr;
-use gnomeqs_core::TransferMetadata;
 use gnomeqs_core::{DeviceType, State};
+use gnomeqs_core::{TransferMetadata, TransferRiskLevel};
 
 pub struct TransferRow {
     pub row: libadwaita::ActionRow,
     pub icon: gtk4::Image,
+    pub risk_label: gtk4::Label,
     pub progress_bar: gtk4::ProgressBar,
     pub pin_label: gtk4::Label,
     pub button_stack: gtk4::Box,
@@ -44,6 +45,13 @@ impl TransferRow {
         let icon = gtk4::Image::from_icon_name("computer-symbolic");
         icon.set_icon_size(gtk4::IconSize::Large);
         row.add_prefix(&icon);
+
+        let risk_label = gtk4::Label::new(None);
+        risk_label.add_css_class("risk-badge");
+        risk_label.set_halign(gtk4::Align::Start);
+        risk_label.set_valign(gtk4::Align::Center);
+        risk_label.set_visible(false);
+        row.add_prefix(&risk_label);
 
         let pin_label = gtk4::Label::new(None);
         pin_label.add_css_class("pin-badge");
@@ -250,6 +258,7 @@ impl TransferRow {
         Self {
             row,
             icon,
+            risk_label,
             progress_bar,
             pin_label,
             button_stack,
@@ -315,6 +324,9 @@ impl TransferRow {
         self.clear_btn.set_visible(false);
         self.progress_bar.set_visible(false);
         self.pin_label.set_visible(false);
+        self.risk_label.set_visible(false);
+        self.risk_label.remove_css_class("high-risk-badge");
+        self.row.set_tooltip_text(None);
         self.button_stack.set_spacing(6);
         *self.open_target.borrow_mut() = None;
         *self.copy_text.borrow_mut() = None;
@@ -337,9 +349,12 @@ impl TransferRow {
                     self.pin_label.set_text(&format!("PIN {pin}"));
                     self.pin_label.set_visible(true);
                 }
+                update_risk_badge(&self.risk_label, meta);
                 self.button_stack.set_spacing(4);
                 let desc = build_transfer_description(meta);
                 self.row.set_subtitle(&desc);
+                self.row
+                    .set_tooltip_text(build_transfer_tooltip(meta).as_deref());
                 *self.last_subtitle.borrow_mut() = desc;
                 self.accept_btn.set_visible(true);
                 self.decline_btn.set_visible(true);
@@ -381,7 +396,11 @@ impl TransferRow {
                 }
             }
             State::Finished => {
-                self.row.add_css_class("transfer-success");
+                if matches!(meta.risk_level, TransferRiskLevel::High) {
+                    self.row.add_css_class("transfer-error");
+                } else {
+                    self.row.add_css_class("transfer-success");
+                }
                 let open_path = resolve_open_target(meta);
                 let desc = if let Some(dest) = &meta.destination {
                     format!("{} {dest}", tr!("Saved to"))
@@ -389,6 +408,9 @@ impl TransferRow {
                     tr!("Received")
                 };
                 self.row.set_subtitle(&desc);
+                update_risk_badge(&self.risk_label, meta);
+                self.row
+                    .set_tooltip_text(build_transfer_tooltip(meta).as_deref());
                 *self.last_subtitle.borrow_mut() = desc;
                 if let Some(path) = open_path {
                     *self.open_target.borrow_mut() = Some(path);
@@ -463,12 +485,90 @@ fn build_transfer_description(meta: &TransferMetadata) -> String {
         } else {
             tr!("files")
         };
-        format!("{} {count} {label}", tr!("Wants to share"))
+        let description = format!(
+            "{} {count} {label} · {}",
+            tr!("Wants to share"),
+            format_size(meta.total_bytes)
+        );
+        description
     } else if meta.text_payload.is_some() {
         format!("{} {}", tr!("Wants to share"), tr!("text"))
     } else {
         tr!("Wants to share")
     }
+}
+
+fn update_risk_badge(label: &gtk4::Label, meta: &TransferMetadata) {
+    match meta.risk_level {
+        TransferRiskLevel::High => {
+            label.set_text(&tr!("High risk"));
+            label.add_css_class("high-risk-badge");
+            label.set_visible(true);
+        }
+        TransferRiskLevel::Extension => {
+            label.set_text(&tr!("Risk"));
+            label.remove_css_class("high-risk-badge");
+            label.set_visible(true);
+        }
+        TransferRiskLevel::None => {
+            if meta.contains_dangerous_files {
+                label.set_text(&tr!("Risk"));
+                label.remove_css_class("high-risk-badge");
+                label.set_visible(true);
+            } else {
+                label.set_visible(false);
+            }
+        }
+    }
+}
+
+fn build_transfer_tooltip(meta: &TransferMetadata) -> Option<String> {
+    let files = meta.files.as_ref()?;
+    let mut lines = vec![format!("{}:", tr!("Files"))];
+    lines.extend(files.iter().take(12).map(|file| format!("- {file}")));
+    if files.len() > 12 {
+        lines.push(format!("+{} {}", files.len() - 12, tr!("more")));
+    }
+    if let Some(destination) = &meta.destination {
+        lines.push(format!("{}: {destination}", tr!("Destination")));
+    }
+    lines.push(format!(
+        "{}: {}",
+        tr!("Size"),
+        format_size(meta.total_bytes)
+    ));
+    match meta.risk_level {
+        TransferRiskLevel::High => {
+            lines.push(tr!(
+                "High risk: this file appears to be disguised or modified; its name or extension does not match the detected content."
+            ));
+            if let Some(file_name) = &meta.suspicious_file_name {
+                lines.push(format!("{}: {file_name}", tr!("File")));
+            }
+            if let Some(description) = &meta.detected_content_description {
+                lines.push(format!("{}: {description}", tr!("Detected type")));
+            }
+            if let Some(label) = &meta.detected_content_label {
+                lines.push(format!("Magika: {label}"));
+            }
+        }
+        TransferRiskLevel::Extension => {
+            lines.push(tr!(
+                "Warning: one or more files may be executable or script-like."
+            ));
+            if let Some(description) = &meta.detected_content_description {
+                lines.push(format!("{}: {description}", tr!("Detected type")));
+            }
+        }
+        TransferRiskLevel::None => {
+            if meta.contains_dangerous_files {
+                lines.push(tr!(
+                    "Warning: one or more files may be executable or script-like."
+                ));
+            }
+        }
+    }
+    Some(lines.join("\n"))
 }
 
 fn progress_subtitle(prefix: &str, meta: &TransferMetadata) -> String {

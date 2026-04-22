@@ -94,8 +94,7 @@ pub async fn run_wifi_direct_discovery(
     if capability.status != WifiDirectStatus::P2pInterfaceAvailable {
         info!(
             "Wi-Fi Direct discovery skipped: status={:?} interface={:?}",
-            capability.status,
-            capability.p2p_interface
+            capability.status, capability.p2p_interface
         );
         return Ok(());
     }
@@ -107,23 +106,20 @@ pub async fn run_wifi_direct_discovery(
     let object_path = network_manager_device_path(&interface)?;
     info!(
         "Wi-Fi Direct discovery starting on interface={} object_path={}",
-        interface,
-        object_path
+        interface, object_path
     );
 
-    match run_gdbus(
-        &[
-            "call",
-            "--system",
-            "--dest",
-            "org.freedesktop.NetworkManager",
-            "--object-path",
-            &object_path,
-            "--method",
-            "org.freedesktop.NetworkManager.Device.WifiP2P.StartFind",
-            "{}",
-        ],
-    ) {
+    match run_gdbus(&[
+        "call",
+        "--system",
+        "--dest",
+        "org.freedesktop.NetworkManager",
+        "--object-path",
+        &object_path,
+        "--method",
+        "org.freedesktop.NetworkManager.Device.WifiP2P.StartFind",
+        "{}",
+    ]) {
         Ok(output) => info!("Wi-Fi Direct StartFind response: {}", output),
         Err(e) => warn!("Wi-Fi Direct StartFind failed: {e}"),
     }
@@ -216,18 +212,16 @@ pub async fn run_wifi_direct_discovery(
         });
     }
 
-    if let Err(e) = run_gdbus(
-        &[
-            "call",
-            "--system",
-            "--dest",
-            "org.freedesktop.NetworkManager",
-            "--object-path",
-            &object_path,
-            "--method",
-            "org.freedesktop.NetworkManager.Device.WifiP2P.StopFind",
-        ],
-    ) {
+    if let Err(e) = run_gdbus(&[
+        "call",
+        "--system",
+        "--dest",
+        "org.freedesktop.NetworkManager",
+        "--object-path",
+        &object_path,
+        "--method",
+        "org.freedesktop.NetworkManager.Device.WifiP2P.StopFind",
+    ]) {
         warn!("Wi-Fi Direct StopFind failed: {e}");
     }
 
@@ -311,11 +305,7 @@ fn detect_linux_network_manager() -> WifiDirectCapability {
                     None,
                 )
             } else {
-                WifiDirectCapability::network_manager(
-                    WifiDirectStatus::NoP2pInterface,
-                    false,
-                    None,
-                )
+                WifiDirectCapability::network_manager(WifiDirectStatus::NoP2pInterface, false, None)
             }
         }
         Err(_) => WifiDirectCapability::unavailable(WifiDirectStatus::BackendQueryFailed),
@@ -337,7 +327,8 @@ fn network_manager_device_path(interface: &str) -> Result<String, anyhow::Error>
     )?;
     let mut lines = output.lines();
     let _ = lines.next();
-    lines.next()
+    lines
+        .next()
         .filter(|line| !line.trim().is_empty())
         .map(|line| line.trim().to_string())
         .ok_or_else(|| anyhow!("NetworkManager did not expose a D-Bus path for {interface}"))
@@ -411,18 +402,20 @@ fn query_wifi_direct_peer(peer_path: &str) -> EndpointInfo {
         .clone()
         .filter(|value| !value.trim().is_empty())
         .or_else(|| model.clone().filter(|value| !value.trim().is_empty()))
-        .or_else(|| manufacturer.clone().filter(|value| !value.trim().is_empty()))
+        .or_else(|| {
+            manufacturer
+                .clone()
+                .filter(|value| !value.trim().is_empty())
+        })
         .or_else(|| hw_address.clone());
 
-    let peer_id_suffix = hw_address
-        .clone()
-        .unwrap_or_else(|| {
-            peer_path
-                .rsplit('/')
-                .next()
-                .unwrap_or("unknown")
-                .to_string()
-        });
+    let peer_id_suffix = hw_address.clone().unwrap_or_else(|| {
+        peer_path
+            .rsplit('/')
+            .next()
+            .unwrap_or("unknown")
+            .to_string()
+    });
 
     let mut label = display_name.unwrap_or_else(|| "Wi-Fi Direct peer".to_string());
     if let Some(strength) = strength {
@@ -467,9 +460,7 @@ pub async fn activate_wifi_direct_peer(peer_mac: &str) -> Result<(), anyhow::Err
 
     info!(
         "Wi-Fi Direct activation requested: peer_mac={} interface={} connection_name={}",
-        peer_mac,
-        interface,
-        connection_name
+        peer_mac, interface, connection_name
     );
 
     let _ = Command::new(&nmcli)
@@ -504,8 +495,7 @@ pub async fn activate_wifi_direct_peer(peer_mac: &str) -> Result<(), anyhow::Err
 
     info!(
         "Wi-Fi Direct activation command accepted: peer_mac={} connection_name={}",
-        peer_mac,
-        connection_name
+        peer_mac, connection_name
     );
 
     Ok(())

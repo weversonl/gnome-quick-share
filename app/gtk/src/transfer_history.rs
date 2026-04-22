@@ -24,6 +24,10 @@ pub struct HistoryEntry {
 }
 
 pub fn load(direction: HistoryDirection) -> Vec<HistoryEntry> {
+    if !settings::get_save_transfer_history() {
+        return Vec::new();
+    }
+
     prune_and_load()
         .into_iter()
         .filter(|entry| entry.direction == direction)
@@ -31,6 +35,10 @@ pub fn load(direction: HistoryDirection) -> Vec<HistoryEntry> {
 }
 
 pub fn append(mut entry: HistoryEntry) -> HistoryEntry {
+    if !settings::get_save_transfer_history() {
+        return entry;
+    }
+
     entry.created_at = unix_now();
     let mut entries = prune_entries(read_all());
     entries.insert(0, entry.clone());

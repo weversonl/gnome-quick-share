@@ -926,6 +926,38 @@ pub fn apply_custom_css() {
   box-shadow: 0 4px 12px rgba(123,130,168,0.14);
 }
 
+.app-window .risk-badge {
+  font-size: 0.78em;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  padding: 3px 9px;
+  border-radius: 999px;
+  margin-left: 2px;
+  margin-right: 8px;
+}
+.app-window.dark-mode .risk-badge {
+  color: #FFE7A3;
+  background: linear-gradient(180deg, rgba(245,158,11,0.34) 0%, rgba(120,53,15,0.40) 100%);
+  border: 1px solid rgba(251,191,36,0.44);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.14), 0 4px 12px rgba(13,16,48,0.28);
+}
+.app-window.light-mode .risk-badge {
+  color: #78350F;
+  background: linear-gradient(180deg, rgba(254,243,199,0.98) 0%, rgba(251,191,36,0.42) 100%);
+  border: 1px solid rgba(217,119,6,0.32);
+  box-shadow: 0 4px 12px rgba(146,64,14,0.12);
+}
+.app-window.dark-mode .risk-badge.high-risk-badge {
+  color: #FFE4E6;
+  background: linear-gradient(180deg, rgba(239,68,68,0.42) 0%, rgba(127,29,29,0.48) 100%);
+  border: 1px solid rgba(252,165,165,0.48);
+}
+.app-window.light-mode .risk-badge.high-risk-badge {
+  color: #7F1D1D;
+  background: linear-gradient(180deg, rgba(254,226,226,0.98) 0%, rgba(248,113,113,0.38) 100%);
+  border: 1px solid rgba(185,28,28,0.30);
+}
+
 /* ── Visibility icons ───────────────────────────────────────── */
 .app-window .visibility-visible {
   color: #4de8c2;

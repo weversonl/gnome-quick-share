@@ -29,9 +29,11 @@ hkdf = "0.12"
 hmac = "0.12"
 libaes = "0.7"
 log = "0.4"
+magika = "1.0.1"
 mdns-sd = { git = "https://github.com/Martichou/mdns-sd", branch = "unsolicited" }
 mime_guess = "2.0"
 num-bigint = "0.4"
+ort = { version = "=2.0.0-rc.11", default-features = false, features = ["copy-dylibs", "download-binaries", "tls-rustls"] }
 once_cell = "1.20"
 p256 = { version = "0.13", features = ["ecdh"] }
 prost = "0.14"

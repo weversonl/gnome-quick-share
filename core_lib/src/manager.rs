@@ -1,12 +1,14 @@
 use serde::{Deserialize, Serialize};
 use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::broadcast;
 use tokio::sync::broadcast::Sender;
 use tokio::sync::mpsc::Receiver;
+use tokio::sync::watch;
 use tokio_util::sync::CancellationToken;
 
 use crate::channel::{ChannelDirection, ChannelMessage, TransferType};
 use crate::errors::AppError;
-use crate::hdl::{InboundRequest, OutboundPayload, OutboundRequest, State};
+use crate::hdl::{InboundRequest, OutboundPayload, OutboundRequest, State, Visibility};
 use crate::{DeviceType, utils::RemoteDeviceInfo};
 
 const INNER_NAME: &str = "TcpServer";
@@ -25,7 +27,9 @@ pub struct TcpServer {
     tcp_listener: TcpListener,
     sender: Sender<ChannelMessage>,
     cancel_sender: Sender<String>,
+    mdns_resend_sender: broadcast::Sender<()>,
     connect_receiver: Receiver<SendInfo>,
+    visibility_receiver: watch::Receiver<Visibility>,
 }
 
 impl TcpServer {
@@ -34,14 +38,18 @@ impl TcpServer {
         tcp_listener: TcpListener,
         sender: Sender<ChannelMessage>,
         cancel_sender: Sender<String>,
+        mdns_resend_sender: broadcast::Sender<()>,
         connect_receiver: Receiver<SendInfo>,
+        visibility_receiver: watch::Receiver<Visibility>,
     ) -> Result<Self, anyhow::Error> {
         Ok(Self {
             endpoint_id,
             tcp_listener,
             sender,
             cancel_sender,
+            mdns_resend_sender,
             connect_receiver,
+            visibility_receiver,
         })
     }
 
@@ -57,7 +65,7 @@ impl TcpServer {
                     break;
                 }
                 Some(i) = self.connect_receiver.recv() => {
-                    info!("{INNER_NAME}: connect_receiver: got {:?}", i);
+                    info!("{INNER_NAME}: outbound request: id={} name={} addr={}", i.id, i.name, i.addr);
                     if let Err(e) = self.connect(cctk, i).await {
                         error!("{INNER_NAME}: error sending: {}", e.to_string());
                     }
@@ -66,8 +74,14 @@ impl TcpServer {
                     match r {
                         Ok((socket, remote_addr)) => {
                             trace!("{INNER_NAME}: new client: {remote_addr}");
+                            if *self.visibility_receiver.borrow() == Visibility::Invisible {
+                                debug!("{INNER_NAME}: rejecting inbound client while hidden");
+                                drop(socket);
+                                continue;
+                            }
                             let esender = self.sender.clone();
                             let csender = self.sender.clone();
+                            let mdns_resend_sender = self.mdns_resend_sender.clone();
 
                             tokio::spawn(async move {
                                 let mut ir = InboundRequest::new(socket, remote_addr.to_string(), csender);
@@ -99,6 +113,10 @@ impl TcpServer {
                                             }
                                         },
                                     }
+                                }
+
+                                if ir.state.state != State::Initial {
+                                    schedule_mdns_resend(mdns_resend_sender).await;
                                 }
                             });
                         },
@@ -170,4 +188,12 @@ impl TcpServer {
 
         Ok(())
     }
+}
+
+async fn schedule_mdns_resend(sender: broadcast::Sender<()>) {
+    let _ = sender.send(());
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    let _ = sender.send(());
+    tokio::time::sleep(std::time::Duration::from_secs(8)).await;
+    let _ = sender.send(());
 }

@@ -100,6 +100,12 @@ msgstr "Tamanho do histórico"
 msgid "maximum items"
 msgstr "itens máximos"
 
+msgid "Save transfer history"
+msgstr "Salvar histórico de transferências"
+
+msgid "Store sent and received transfer names locally."
+msgstr "Armazena localmente nomes de transferências enviadas e recebidas."
+
 msgid "Sending..."
 msgstr "Enviando..."
 
@@ -270,6 +276,39 @@ msgstr "Rede"
 
 msgid "Files"
 msgstr "Arquivos"
+
+msgid "Destination"
+msgstr "Destino"
+
+msgid "Size"
+msgstr "Tamanho"
+
+msgid "Save to"
+msgstr "Salvar em"
+
+msgid "Potentially unsafe file type"
+msgstr "Tipo de arquivo potencialmente inseguro"
+
+msgid "Risk"
+msgstr "Risco"
+
+msgid "High risk"
+msgstr "Alto risco"
+
+msgid "Warning: one or more files may be executable or script-like."
+msgstr "Aviso: um ou mais arquivos podem ser executáveis ou scripts."
+
+msgid "High risk: this file appears to be disguised or modified; its name or extension does not match the detected content."
+msgstr "Alto risco: este arquivo parece ter sido disfarçado ou modificado; o nome ou a extensão não combina com o conteúdo detectado."
+
+msgid "File"
+msgstr "Arquivo"
+
+msgid "Detected type"
+msgstr "Tipo detectado"
+
+msgid "more"
+msgstr "mais"
 
 msgid "System"
 msgstr "Sistema"

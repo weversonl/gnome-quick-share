@@ -281,10 +281,12 @@ impl ReceiveView {
                             subtitle,
                             open_target,
                         };
-                        let entry = transfer_history::append(entry);
-                        prepend_receive_history_row(&recent_list, entry, &history_controls);
-                        history_controls.history_button.set_visible(true);
-                        history_controls.history_button.set_hexpand(true);
+                        if settings::get_save_transfer_history() {
+                            let entry = transfer_history::append(entry);
+                            prepend_receive_history_row(&recent_list, entry, &history_controls);
+                            history_controls.history_button.set_visible(true);
+                            history_controls.history_button.set_hexpand(true);
+                        }
                     }
                     if map.is_empty() {
                         list.set_visible(false);

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 use p256::{PublicKey, SecretKey};
 use serde::{Deserialize, Serialize};
@@ -61,6 +62,7 @@ pub struct InnerState {
     pub pin_code: Option<String>,
     pub transfer_metadata: Option<TransferMetadata>,
     pub transferred_files: HashMap<i64, InternalFileInfo>,
+    pub completed_files: Vec<PathBuf>,
 
     pub cipher_commitment: Option<CipherCommitment>,
     pub private_key: Option<SecretKey>,

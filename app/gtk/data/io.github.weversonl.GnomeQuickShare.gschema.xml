@@ -94,6 +94,11 @@
       <summary>Maximum transfer history entries</summary>
     </key>
 
+    <key name="save-transfer-history" type="b">
+      <default>true</default>
+      <summary>Save local transfer history</summary>
+    </key>
+
     <!-- Window state -->
     <key name="window-width" type="i">
       <default>400</default>

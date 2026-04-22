@@ -1,11 +1,15 @@
-use std::fs::{self, File};
-use std::os::unix::fs::FileExt;
+use std::fs::{self, OpenOptions};
+use std::os::unix::fs::{FileExt, OpenOptionsExt};
+use std::path::{Component, Path, PathBuf};
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use anyhow::anyhow;
 use bytes::Bytes;
 use hmac::{Hmac, Mac};
-use libaes::{Cipher, AES_256_KEY_LEN};
+use libaes::{AES_256_KEY_LEN, Cipher};
+use magika::{Session as MagikaSession, TypeInfo as MagikaTypeInfo};
+use once_cell::sync::Lazy;
 use p256::ecdh::diffie_hellman;
 use p256::elliptic_curve::sec1::{FromEncodedPoint, ToEncodedPoint};
 use p256::{EncodedPoint, PublicKey};
@@ -18,16 +22,16 @@ use tokio::sync::broadcast::{Receiver, Sender};
 
 use super::{InnerState, State};
 use crate::channel::{ChannelAction, ChannelDirection, ChannelMessage};
-use crate::hdl::info::{InternalFileInfo, TransferMetadata};
+use crate::hdl::info::{InternalFileInfo, TransferMetadata, TransferRiskLevel};
 use crate::hdl::{TextPayloadInfo, TextPayloadType};
 use crate::location_nearby_connections::payload_transfer_frame::{
-    payload_header, PacketType, PayloadChunk, PayloadHeader,
+    PacketType, PayloadChunk, PayloadHeader, payload_header,
 };
 use crate::location_nearby_connections::{KeepAliveFrame, OfflineFrame, PayloadTransferFrame};
 use crate::securegcm::ukey2_alert::AlertType;
 use crate::securegcm::{
-    ukey2_message, DeviceToDeviceMessage, GcmMetadata, Type, Ukey2Alert, Ukey2ClientFinished,
-    Ukey2ClientInit, Ukey2HandshakeCipher, Ukey2Message, Ukey2ServerInit,
+    DeviceToDeviceMessage, GcmMetadata, Type, Ukey2Alert, Ukey2ClientFinished, Ukey2ClientInit,
+    Ukey2HandshakeCipher, Ukey2Message, Ukey2ServerInit, ukey2_message,
 };
 use crate::securemessage::{
     EcP256PublicKey, EncScheme, GenericPublicKey, Header, HeaderAndBody, PublicKeyType,
@@ -35,8 +39,8 @@ use crate::securemessage::{
 };
 use crate::sharing_nearby::{paired_key_result_frame, text_metadata};
 use crate::utils::{
-    encode_point, gen_ecdsa_keypair, gen_random, get_download_dir, hkdf_extract_expand,
-    stream_read_exact, to_four_digit_string, DeviceType, RemoteDeviceInfo,
+    DeviceType, RemoteDeviceInfo, encode_point, gen_ecdsa_keypair, gen_random, get_download_dir,
+    hkdf_extract_expand, stream_read_exact, to_four_digit_string,
 };
 use crate::{location_nearby_connections, sharing_nearby};
 
@@ -46,6 +50,17 @@ const SANE_FRAME_LENGTH: i32 = 5 * 1024 * 1024;
 const SANITY_DURATION: Duration = Duration::from_micros(10);
 const PROGRESS_UPDATE_INTERVAL: Duration = Duration::from_millis(100);
 const PROGRESS_UPDATE_BYTES: u64 = 2 * 1024 * 1024;
+const RECEIVED_FILE_MODE: u32 = 0o600;
+static MAGIKA_SESSION: Lazy<Mutex<Option<MagikaSession>>> = Lazy::new(|| Mutex::new(None));
+
+#[derive(Debug, Clone)]
+struct MagikaDetection {
+    label: String,
+    description: String,
+    mime_type: String,
+    group: String,
+    extensions: Vec<String>,
+}
 
 #[derive(Debug)]
 pub struct InboundRequest {
@@ -68,10 +83,7 @@ impl InboundRequest {
 
             if file_info.file_url.exists() {
                 if let Err(e) = fs::remove_file(&file_info.file_url) {
-                    warn!(
-                        "failed to remove partial file {:?}: {}",
-                        file_info.file_url, e
-                    );
+                    warn!("failed to remove partial received file: {}", e);
                 }
             }
         }
@@ -112,7 +124,7 @@ impl InboundRequest {
                             return Ok(());
                         }
 
-                        debug!("inbound: got: {:?}", channel_msg);
+                        debug!("inbound: got channel action for current transfer");
                         match channel_msg.action {
                             Some(ChannelAction::AcceptTransfer) => {
                                 self.accept_transfer().await?;
@@ -178,7 +190,7 @@ impl InboundRequest {
                 debug!("Handling State::Initial frame");
                 let frame = location_nearby_connections::OfflineFrame::decode(&*frame_data)?;
                 let rdi = self.process_connection_request(&frame)?;
-                info!("RemoteDeviceInfo: {:?}", &rdi);
+                info!("Inbound connection request from {}", rdi.name);
 
                 self.update_state(
                     |e: &mut InnerState| {
@@ -488,8 +500,7 @@ impl InboundRequest {
         let mut hmac = HmacSha256::new_from_slice(self.state.recv_hmac_key.as_ref().unwrap())?;
         hmac.update(&smsg.header_and_body);
         let hmac_bytes = hmac.finalize().into_bytes();
-        if !hmac_bytes[..].eq(smsg.signature.as_slice())
-        {
+        if !hmac_bytes[..].eq(smsg.signature.as_slice()) {
             return Err(anyhow!("hmac!=signature"));
         }
 
@@ -660,7 +671,9 @@ impl InboundRequest {
                         let chunk_size = chunk.body().len();
                         if current_offset + chunk_size as i64 > file_internal.total_size {
                             return Err(anyhow!(
-                                "Transferred file size exceeds previously specified value: {} vs {}", current_offset + chunk_size as i64, file_internal.total_size
+                                "Transferred file size exceeds previously specified value: {} vs {}",
+                                current_offset + chunk_size as i64,
+                                file_internal.total_size
                             ));
                         }
 
@@ -678,11 +691,11 @@ impl InboundRequest {
                                 .as_ref()
                                 .map(|tmd| tmd.ack_bytes + chunk_size as u64)
                                 .unwrap_or(chunk_size as u64);
-                            let should_inform =
-                                next_ack_bytes.saturating_sub(self.last_progress_ui_bytes)
-                                    >= PROGRESS_UPDATE_BYTES
-                                    || self.last_progress_ui_update.elapsed()
-                                        >= PROGRESS_UPDATE_INTERVAL;
+                            let should_inform = next_ack_bytes
+                                .saturating_sub(self.last_progress_ui_bytes)
+                                >= PROGRESS_UPDATE_BYTES
+                                || self.last_progress_ui_update.elapsed()
+                                    >= PROGRESS_UPDATE_INTERVAL;
 
                             self.update_state(
                                 |e| {
@@ -699,8 +712,14 @@ impl InboundRequest {
                                 self.last_progress_ui_bytes = next_ack_bytes;
                             }
                         } else if (chunk.flags() & 1) == 1 {
-                            self.state.transferred_files.remove(&payload_id);
+                            if let Some(mut finished_file) =
+                                self.state.transferred_files.remove(&payload_id)
+                            {
+                                finished_file.file.take();
+                                self.state.completed_files.push(finished_file.file_url);
+                            }
                             if self.state.transferred_files.is_empty() {
+                                self.apply_magika_analysis();
                                 info!("Transfer finished");
                                 self.update_state(
                                     |e| {
@@ -730,7 +749,7 @@ impl InboundRequest {
                 self.send_keepalive(true).await?;
             }
             _ => {
-                error!("Unhandled offline frame encrypted: {:?}", offline);
+                debug!("Ignoring unhandled encrypted offline frame type");
             }
         }
 
@@ -788,7 +807,7 @@ impl InboundRequest {
                 self.process_introduction(v1_frame).await?;
             }
             _ => {
-                info!(
+                debug!(
                     "Unhandled connection state in process_transfer_setup: {:?}",
                     self.state.state
                 );
@@ -856,27 +875,8 @@ impl InboundRequest {
             let mut total_bytes: u64 = 0;
 
             for file in &introduction.file_metadata {
-                info!("File name: {}", file.name());
-
-                let mut dest = get_download_dir();
-                dest.push(file.name());
-
-                info!("Destination: {:?}", dest);
-                if dest.exists() {
-                    let mut counter = 1;
-                    dest.pop();
-
-                    loop {
-                        dest.push(format!("{}_{}", counter, file.name()));
-                        if !dest.exists() {
-                            break;
-                        }
-                        dest.pop();
-                        counter += 1;
-                    }
-
-                    info!("New destination: {:?}", dest);
-                }
+                let safe_name = sanitize_received_file_name(file.name())?;
+                let dest = unique_destination_path(&get_download_dir(), &safe_name);
 
                 let info = InternalFileInfo {
                     payload_id: file.payload_id(),
@@ -887,8 +887,19 @@ impl InboundRequest {
                 };
                 total_bytes += info.total_size as u64;
                 self.state.transferred_files.insert(file.payload_id(), info);
-                files_name.push(file.name().to_owned());
+                files_name.push(safe_name);
             }
+
+            let risk_level = if self
+                .state
+                .transferred_files
+                .values()
+                .any(|file| is_potentially_dangerous_file_name(&file.file_url))
+            {
+                TransferRiskLevel::Extension
+            } else {
+                TransferRiskLevel::None
+            };
 
             let metadata = TransferMetadata {
                 id: self.state.id.clone(),
@@ -902,11 +913,17 @@ impl InboundRequest {
                 files: Some(files_name),
                 pin_code: self.state.pin_code.clone(),
                 text_description: None,
+                contains_dangerous_files: !matches!(risk_level, TransferRiskLevel::None),
+                risk_level,
                 total_bytes,
                 ..Default::default()
             };
 
-            info!("Asking for user consent: {:?}", metadata);
+            info!(
+                "Asking for user consent: files={} total_bytes={}",
+                metadata.files.as_ref().map(Vec::len).unwrap_or_default(),
+                metadata.total_bytes
+            );
             self.update_state(
                 |e| {
                     e.transfer_metadata = Some(metadata);
@@ -930,7 +947,7 @@ impl InboundRequest {
                         ..Default::default()
                     };
 
-                    info!("Asking for user consent: {:?}", metadata);
+                    info!("Asking for user consent: text/url payload");
                     self.update_state(
                         |e| {
                             e.text_payload = Some(TextPayloadInfo::Url(meta.payload_id()));
@@ -953,7 +970,7 @@ impl InboundRequest {
                         ..Default::default()
                     };
 
-                    info!("Asking for user consent: {:?}", metadata);
+                    info!("Asking for user consent: text payload");
                     self.update_state(
                         |e| {
                             e.text_payload = Some(TextPayloadInfo::Text(meta.payload_id()));
@@ -1031,10 +1048,42 @@ impl InboundRequest {
 
         for id in ids {
             let mfi = self.state.transferred_files.get_mut(&id).unwrap();
+            if mfi.file_url.exists() {
+                let parent = mfi
+                    .file_url
+                    .parent()
+                    .map(Path::to_path_buf)
+                    .unwrap_or_else(get_download_dir);
+                let file_name = mfi
+                    .file_url
+                    .file_name()
+                    .and_then(|value| value.to_str())
+                    .unwrap_or("file")
+                    .to_owned();
+                mfi.file_url = unique_destination_path(&parent, &file_name);
+            }
 
-            let file = File::create(&mfi.file_url)?;
-            info!("Created file: {:?}", &file);
+            let file = OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(RECEIVED_FILE_MODE)
+                .open(&mfi.file_url)?;
             mfi.file = Some(file);
+        }
+
+        let final_file_names: Vec<String> = self
+            .state
+            .transferred_files
+            .values()
+            .filter_map(|file| {
+                file.file_url
+                    .file_name()
+                    .and_then(|value| value.to_str())
+                    .map(str::to_owned)
+            })
+            .collect();
+        if let Some(metadata) = self.state.transfer_metadata.as_mut() {
+            metadata.files = Some(final_file_names);
         }
 
         let frame = sharing_nearby::Frame {
@@ -1344,6 +1393,54 @@ impl InboundRequest {
         self.state.client_seq
     }
 
+    fn apply_magika_analysis(&mut self) {
+        let mut next_risk = self
+            .state
+            .transfer_metadata
+            .as_ref()
+            .map(|metadata| metadata.risk_level)
+            .unwrap_or_default();
+        let mut suspicious_file_name = None;
+        let mut detected_content_label = None;
+        let mut detected_content_description = None;
+
+        for path in &self.state.completed_files {
+            let Some(detection) = identify_received_file_with_magika(path) else {
+                continue;
+            };
+            let extension_risk = is_potentially_dangerous_file_name(path);
+            let content_risk = is_potentially_dangerous_magika_type(&detection);
+            let extension_matches = file_extension_matches_magika(path, &detection);
+
+            if content_risk && !extension_risk && !extension_matches {
+                next_risk = TransferRiskLevel::High;
+                suspicious_file_name = path
+                    .file_name()
+                    .and_then(|value| value.to_str())
+                    .map(str::to_owned);
+                detected_content_label = Some(detection.label);
+                detected_content_description = Some(detection.description);
+                break;
+            }
+
+            if content_risk || extension_risk {
+                next_risk = TransferRiskLevel::Extension;
+                if detected_content_label.is_none() {
+                    detected_content_label = Some(detection.label);
+                    detected_content_description = Some(detection.description);
+                }
+            }
+        }
+
+        if let Some(metadata) = self.state.transfer_metadata.as_mut() {
+            metadata.risk_level = next_risk;
+            metadata.contains_dangerous_files = !matches!(next_risk, TransferRiskLevel::None);
+            metadata.suspicious_file_name = suspicious_file_name;
+            metadata.detected_content_label = detected_content_label;
+            metadata.detected_content_description = detected_content_description;
+        }
+    }
+
     async fn update_state<F>(&mut self, f: F, inform: bool)
     where
         F: FnOnce(&mut InnerState),
@@ -1364,5 +1461,210 @@ impl InboundRequest {
             ..Default::default()
         });
         tokio::time::sleep(SANITY_DURATION).await;
+    }
+}
+
+fn sanitize_received_file_name(name: &str) -> Result<String, anyhow::Error> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Err(anyhow!("received file name is empty"));
+    }
+
+    let path = Path::new(trimmed);
+    if path.is_absolute() || path.components().count() != 1 {
+        return Err(anyhow!("received file name is not a plain file name"));
+    }
+
+    if path
+        .components()
+        .any(|component| !matches!(component, Component::Normal(_)))
+    {
+        return Err(anyhow!(
+            "received file name contains invalid path components"
+        ));
+    }
+
+    if trimmed.contains('/') || trimmed.contains('\\') || trimmed.contains('\0') {
+        return Err(anyhow!("received file name contains path separators"));
+    }
+
+    Ok(trimmed.to_owned())
+}
+
+fn unique_destination_path(download_dir: &Path, file_name: &str) -> PathBuf {
+    let candidate = download_dir.join(file_name);
+    if !candidate.exists() {
+        return candidate;
+    }
+
+    let path = Path::new(file_name);
+    let stem = path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .filter(|value| !value.is_empty())
+        .unwrap_or("file");
+    let extension = path.extension().and_then(|value| value.to_str());
+
+    for counter in 1.. {
+        let numbered = match extension {
+            Some(extension) if !extension.is_empty() => format!("{stem} ({counter}).{extension}"),
+            _ => format!("{stem} ({counter})"),
+        };
+        let candidate = download_dir.join(numbered);
+        if !candidate.exists() {
+            return candidate;
+        }
+    }
+
+    unreachable!("unbounded counter should always find a free file name")
+}
+
+fn is_potentially_dangerous_file_name(path: &Path) -> bool {
+    let Some(file_name) = path.file_name().and_then(|value| value.to_str()) else {
+        return false;
+    };
+    let lower = file_name.to_ascii_lowercase();
+    let dangerous_extensions = [
+        "appimage", "bat", "cmd", "com", "desktop", "exe", "jar", "js", "msi", "ps1", "run", "scr",
+        "sh", "vbs",
+    ];
+
+    if lower.ends_with(".tar.gz") || lower.ends_with(".tar.xz") || lower.ends_with(".tar.bz2") {
+        return false;
+    }
+
+    let parts: Vec<&str> = lower.split('.').filter(|part| !part.is_empty()).collect();
+    let Some(extension) = parts.last() else {
+        return false;
+    };
+
+    dangerous_extensions.contains(extension)
+        || (parts.len() >= 3 && dangerous_extensions.contains(parts.last().unwrap()))
+}
+
+fn identify_received_file_with_magika(path: &Path) -> Option<MagikaDetection> {
+    let mut guard = match MAGIKA_SESSION.lock() {
+        Ok(guard) => guard,
+        Err(error) => {
+            warn!("Magika session lock poisoned: {error}");
+            return None;
+        }
+    };
+
+    if guard.is_none() {
+        match MagikaSession::new() {
+            Ok(session) => {
+                *guard = Some(session);
+            }
+            Err(error) => {
+                warn!("Failed to initialize Magika session: {error}");
+                return None;
+            }
+        }
+    }
+
+    let session = guard.as_mut()?;
+    let file_type = match session.identify_file_sync(path) {
+        Ok(file_type) => file_type,
+        Err(error) => {
+            warn!("Magika failed to identify received file: {error}");
+            return None;
+        }
+    };
+    let info: &MagikaTypeInfo = file_type.info();
+
+    Some(MagikaDetection {
+        label: info.label.to_owned(),
+        description: info.description.to_owned(),
+        mime_type: info.mime_type.to_owned(),
+        group: info.group.to_owned(),
+        extensions: info
+            .extensions
+            .iter()
+            .map(|extension| extension.to_ascii_lowercase())
+            .collect(),
+    })
+}
+
+fn is_potentially_dangerous_magika_type(detection: &MagikaDetection) -> bool {
+    if detection.group == "executable" {
+        return true;
+    }
+
+    let risky_labels = [
+        "apk",
+        "app",
+        "application",
+        "autohotkey",
+        "autoit",
+        "batch",
+        "com",
+        "dex",
+        "dll",
+        "dos",
+        "elf",
+        "exe",
+        "hta",
+        "javascript",
+        "jar",
+        "lua",
+        "mach-o",
+        "msi",
+        "perl",
+        "php",
+        "powershell",
+        "python",
+        "pythonbytecode",
+        "ruby",
+        "shell",
+        "vbscript",
+        "wasm",
+    ];
+    if risky_labels.contains(&detection.label.as_str()) {
+        return true;
+    }
+
+    detection.mime_type.contains("script")
+        || detection.mime_type.contains("javascript")
+        || detection.mime_type.contains("x-python")
+        || detection.mime_type.contains("x-powershell")
+}
+
+fn file_extension_matches_magika(path: &Path, detection: &MagikaDetection) -> bool {
+    let Some(extension) = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(|value| value.to_ascii_lowercase())
+    else {
+        return false;
+    };
+
+    detection
+        .extensions
+        .iter()
+        .any(|candidate| candidate == &extension)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn magika_flags_disguised_shell_script_as_high_risk() {
+        let path =
+            std::env::temp_dir().join(format!("gnomeqs-magika-{}.jpg", uuid::Uuid::new_v4()));
+        std::fs::write(&path, b"#!/bin/sh\necho hello\n").unwrap();
+
+        let detection = identify_received_file_with_magika(&path).unwrap();
+        let extension_risk = is_potentially_dangerous_file_name(&path);
+        let content_risk = is_potentially_dangerous_magika_type(&detection);
+        let extension_matches = file_extension_matches_magika(&path, &detection);
+
+        let _ = std::fs::remove_file(&path);
+
+        assert_eq!(detection.label, "shell");
+        assert!(!extension_risk);
+        assert!(content_risk);
+        assert!(!extension_matches);
     }
 }

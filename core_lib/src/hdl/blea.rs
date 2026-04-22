@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use bluer::adv::Advertisement;
 use bluer::UuidExt;
+use bluer::adv::Advertisement;
 use bytes::Bytes;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;

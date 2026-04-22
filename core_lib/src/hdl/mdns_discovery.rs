@@ -168,6 +168,10 @@ impl MDnsDiscovery {
             }
         }
 
+        if let Err(err) = self.daemon.stop_browse(service_type) {
+            debug!("MDnsDiscovery: stop_browse failed: {}", err);
+        }
+
         Ok(())
     }
 }

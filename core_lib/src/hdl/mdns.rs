@@ -5,13 +5,14 @@ use mdns_sd::{AddrType, ServiceDaemon, ServiceInfo};
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::watch;
-use tokio::time::{interval_at, Instant};
+use tokio::time::{Instant, interval_at};
 use tokio_util::sync::CancellationToken;
 
-use crate::utils::{gen_mdns_endpoint_info, gen_mdns_name, DeviceType};
+use crate::utils::{DeviceType, gen_mdns_endpoint_info, gen_mdns_name};
 
 const INNER_NAME: &str = "MDnsServer";
 const TICK_INTERVAL: Duration = Duration::from_secs(60);
+const RESEND_INTERVAL: Duration = Duration::from_secs(12);
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum Visibility {
@@ -64,7 +65,9 @@ impl MDnsServer {
         let monitor = self.daemon.monitor()?;
         let ble_receiver = &mut self.ble_receiver;
         let mut visibility = *self.visibility_receiver.borrow();
-        let mut interval = interval_at(Instant::now() + TICK_INTERVAL, TICK_INTERVAL);
+        let mut temporary_visibility_interval =
+            interval_at(Instant::now() + TICK_INTERVAL, TICK_INTERVAL);
+        let mut resend_interval = interval_at(Instant::now() + RESEND_INTERVAL, RESEND_INTERVAL);
         let mut registered = false;
 
         if visibility != Visibility::Invisible {
@@ -104,7 +107,7 @@ impl MDnsServer {
                             self.daemon.register(self.service_info.clone())?;
                             registered = true;
                         }
-                        interval.reset();
+                        temporary_visibility_interval.reset();
                     }
                 }
                 _ = ble_receiver.recv() => {
@@ -120,7 +123,20 @@ impl MDnsServer {
                         registered = true;
                     }
                 },
-                _ = interval.tick() => {
+                _ = resend_interval.tick() => {
+                    if visibility == Visibility::Invisible {
+                        continue;
+                    }
+
+                    if registered {
+                        debug!("{INNER_NAME}: resending visible service announcement");
+                        self.daemon.register_resend(self.service_info.get_fullname())?;
+                    } else {
+                        self.daemon.register(self.service_info.clone())?;
+                        registered = true;
+                    }
+                },
+                _ = temporary_visibility_interval.tick() => {
                     if visibility != Visibility::Temporarily {
                         continue;
                     }

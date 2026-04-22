@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 use anyhow::anyhow;
 use bytes::Bytes;
 use hmac::{Hmac, Mac};
-use libaes::{Cipher, AES_256_KEY_LEN};
+use libaes::{AES_256_KEY_LEN, Cipher};
 use p256::ecdh::diffie_hellman;
 use p256::elliptic_curve::sec1::{FromEncodedPoint, ToEncodedPoint};
 use p256::{EncodedPoint, PublicKey};
@@ -26,25 +26,25 @@ use crate::channel::{ChannelAction, ChannelDirection, ChannelMessage};
 use crate::location_nearby_connections::bandwidth_upgrade_negotiation_frame::upgrade_path_info::Medium;
 use crate::location_nearby_connections::connection_response_frame::ResponseStatus;
 use crate::location_nearby_connections::payload_transfer_frame::{
-    payload_header, PacketType, PayloadChunk, PayloadHeader,
+    PacketType, PayloadChunk, PayloadHeader, payload_header,
 };
 use crate::location_nearby_connections::{KeepAliveFrame, OfflineFrame, PayloadTransferFrame};
 use crate::securegcm::ukey2_alert::AlertType;
 use crate::securegcm::ukey2_client_init::CipherCommitment;
 use crate::securegcm::{
-    ukey2_message, DeviceToDeviceMessage, GcmMetadata, Type, Ukey2Alert, Ukey2ClientFinished,
-    Ukey2ClientInit, Ukey2HandshakeCipher, Ukey2Message, Ukey2ServerInit,
+    DeviceToDeviceMessage, GcmMetadata, Type, Ukey2Alert, Ukey2ClientFinished, Ukey2ClientInit,
+    Ukey2HandshakeCipher, Ukey2Message, Ukey2ServerInit, ukey2_message,
 };
 use crate::securemessage::{
     EcP256PublicKey, EncScheme, GenericPublicKey, Header, HeaderAndBody, PublicKeyType,
     SecureMessage, SigScheme,
 };
 use crate::sharing_nearby::{
-    file_metadata, paired_key_result_frame, FileMetadata, IntroductionFrame,
+    FileMetadata, IntroductionFrame, file_metadata, paired_key_result_frame,
 };
 use crate::utils::{
-    encode_point, gen_ecdsa_keypair, gen_random, hkdf_extract_expand, stream_read_exact,
-    to_four_digit_string, DeviceType, RemoteDeviceInfo,
+    DeviceType, RemoteDeviceInfo, encode_point, gen_ecdsa_keypair, gen_random, hkdf_extract_expand,
+    stream_read_exact, to_four_digit_string,
 };
 use crate::{location_nearby_connections, sharing_nearby};
 
@@ -80,8 +80,7 @@ impl OutboundRequest {
                 Ok(cancel_id) => {
                     info!(
                         "outbound cancel polled: current_transfer_id={} received_cancel_id={}",
-                        self.state.id,
-                        cancel_id
+                        self.state.id, cancel_id
                     );
                     if cancel_id == self.state.id {
                         info!("outbound cancel matched transfer_id={}", self.state.id);
@@ -183,7 +182,7 @@ impl OutboundRequest {
                             return Ok(());
                         }
 
-                        debug!("outbound: got: {:?}", channel_msg);
+                        debug!("outbound: got channel action for current transfer");
                         match channel_msg.action {
                             Some(ChannelAction::CancelTransfer) => {
                                 self.update_state(
@@ -283,7 +282,12 @@ impl OutboundRequest {
                 ),
                 connection_request: Some(location_nearby_connections::ConnectionRequestFrame {
                     endpoint_id: Some(String::from_utf8_lossy(&self.endpoint_id).to_string()),
-                    endpoint_name: Some(gethostname::gethostname().to_string_lossy().into_owned().into_bytes()),
+                    endpoint_name: Some(
+                        gethostname::gethostname()
+                            .to_string_lossy()
+                            .into_owned()
+                            .into_bytes(),
+                    ),
                     endpoint_info: Some(
                         RemoteDeviceInfo {
                             name: gethostname::gethostname().to_string_lossy().into_owned(),
@@ -477,8 +481,7 @@ impl OutboundRequest {
         let mut hmac = HmacSha256::new_from_slice(self.state.recv_hmac_key.as_ref().unwrap())?;
         hmac.update(&smsg.header_and_body);
         let hmac_bytes = hmac.finalize().into_bytes();
-        if !hmac_bytes[..].eq(smsg.signature.as_slice())
-        {
+        if !hmac_bytes[..].eq(smsg.signature.as_slice()) {
             return Err(anyhow!("hmac!=signature"));
         }
 
@@ -691,21 +694,21 @@ impl OutboundRequest {
                 for f in files {
                     let path = Path::new(f);
                     if !path.is_file() {
-                        warn!("Path is not a file: {}", f);
+                        warn!("Selected outbound path is not a file");
                         continue;
                     }
 
                     let file = match File::open(f) {
                         Ok(_f) => _f,
                         Err(e) => {
-                            error!("Failed to open file: {f}: {:?}", e);
+                            error!("Failed to open selected outbound file: {:?}", e);
                             continue;
                         }
                     };
                     let fmetadata = match file.metadata() {
                         Ok(_fm) => _fm,
                         Err(e) => {
-                            error!("Failed to get metadata for: {f}: {:?}", e);
+                            error!("Failed to get selected outbound file metadata: {:?}", e);
                             continue;
                         }
                     };
@@ -834,7 +837,7 @@ impl OutboundRequest {
                                 None => break,
                             };
 
-                            info!("> Currently sending {:?}", curr_state.file_url);
+                            info!("Sending file payload {}", current);
                             if curr_state.bytes_transferred == curr_state.total_size {
                                 debug!("File {current} finished");
                                 self.update_state(
@@ -873,7 +876,7 @@ impl OutboundRequest {
                             "> File ready: {bytes_read} bytes && {} && left to send: {} with current offset: {}",
                             sending_buffer.len(),
                             curr_state.total_size - curr_state.bytes_transferred,
-							curr_state.bytes_transferred
+                            curr_state.bytes_transferred
                         );
 
                         let payload_header = PayloadHeader {
@@ -918,8 +921,8 @@ impl OutboundRequest {
                             .as_ref()
                             .map(|tmd| tmd.ack_bytes + bytes_read as u64)
                             .unwrap_or(bytes_read as u64);
-                        let reached_file_end =
-                            curr_state.bytes_transferred + bytes_read as i64 == curr_state.total_size;
+                        let reached_file_end = curr_state.bytes_transferred + bytes_read as i64
+                            == curr_state.total_size;
                         let should_inform = reached_file_end
                             || next_ack_bytes.saturating_sub(self.last_progress_ui_bytes)
                                 >= PROGRESS_UPDATE_BYTES

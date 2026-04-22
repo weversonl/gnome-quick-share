@@ -31,7 +31,7 @@ mod manager;
 mod utils;
 mod wifi_direct;
 
-pub use hdl::info::TransferMetadata;
+pub use hdl::info::{TransferMetadata, TransferRiskLevel};
 pub use hdl::{EndpointInfo, EndpointTransport, OutboundPayload, State, Visibility};
 pub use manager::SendInfo;
 pub use utils::{DeviceType, RemoteDeviceInfo};
@@ -135,7 +135,9 @@ impl RQS {
             tcp_listener,
             self.message_sender.clone(),
             self.cancel_sender.clone(),
+            self.ble_sender.clone(),
             send_channel.1,
+            self.visibility_receiver.clone(),
         )?;
         let ctk = ctoken.clone();
         tracker.spawn(async move { server.run(ctk).await });
@@ -251,7 +253,7 @@ impl RQS {
     }
 
     pub fn set_download_path(&self, p: Option<PathBuf>) {
-        debug!("Setting the download path to {:?}", p);
+        debug!("Updating download path");
         let mut guard = CUSTOM_DOWNLOAD.write().unwrap();
         *guard = p;
     }

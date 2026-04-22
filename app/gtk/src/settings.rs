@@ -87,6 +87,10 @@ pub fn get_history_max_items() -> i32 {
     settings().int("history-max-items").clamp(1, 500)
 }
 
+pub fn get_save_transfer_history() -> bool {
+    settings().boolean("save-transfer-history")
+}
+
 pub fn font_size_css_px() -> i32 {
     match get_font_size() {
         0 => 13,

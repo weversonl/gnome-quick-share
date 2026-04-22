@@ -669,21 +669,23 @@ impl SendView {
                             None
                         };
                         list.remove(&row.row);
-                        let entry = transfer_history::append(HistoryEntry {
-                            created_at: 0,
-                            direction: HistoryDirection::Send,
-                            title,
-                            subtitle,
-                            open_target: None,
-                        });
-                        prepend_history_row(
-                            &recent_list,
-                            entry,
-                            retry_request,
-                            tx_history.clone(),
-                            &history_controls,
-                        );
-                        history_controls.history_button.set_visible(true);
+                        if settings::get_save_transfer_history() {
+                            let entry = transfer_history::append(HistoryEntry {
+                                created_at: 0,
+                                direction: HistoryDirection::Send,
+                                title,
+                                subtitle,
+                                open_target: None,
+                            });
+                            prepend_history_row(
+                                &recent_list,
+                                entry,
+                                retry_request,
+                                tx_history.clone(),
+                                &history_controls,
+                            );
+                            history_controls.history_button.set_visible(true);
+                        }
                     }
                     list.set_visible(!map.is_empty());
                     transfers_heading.set_visible(!map.is_empty());

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
-use crate::hdl::info::TransferMetadata;
 use crate::hdl::State;
+use crate::hdl::info::TransferMetadata;
 
 #[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
 pub enum ChannelDirection {
