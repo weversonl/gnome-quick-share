@@ -10,7 +10,7 @@ use crate::utils::RemoteDeviceInfo;
 #[cfg(feature = "experimental")]
 mod ble;
 #[cfg(feature = "experimental")]
-pub use ble::*;
+pub use ble::{BleDiscovery, BleListener};
 #[cfg(all(feature = "experimental", target_os = "linux"))]
 mod blea;
 #[cfg(all(feature = "experimental", target_os = "linux"))]

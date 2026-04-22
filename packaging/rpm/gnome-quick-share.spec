@@ -67,4 +67,6 @@ DESTDIR=%{buildroot} meson install -C _build
 %{_datadir}/icons/hicolor/scalable/actions/io.github.weversonl.GnomeQuickShare-send-symbolic.svg
 %{_datadir}/icons/hicolor/scalable/actions/io.github.weversonl.GnomeQuickShare-upload-symbolic.svg
 %{_datadir}/icons/hicolor/scalable/status/io.github.weversonl.GnomeQuickShare-tray-symbolic.svg
+%{_datadir}/icons/hicolor/scalable/status/io.github.weversonl.GnomeQuickShare-tray-dark-symbolic.svg
+%{_datadir}/icons/hicolor/scalable/status/io.github.weversonl.GnomeQuickShare-tray-light-symbolic.svg
 %{_datadir}/locale/pt_BR/LC_MESSAGES/gnomeqs.mo

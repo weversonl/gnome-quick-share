@@ -130,11 +130,44 @@ msgstr "Fechar"
 msgid "Start on boot"
 msgstr "Iniciar com o sistema"
 
+msgid "Launch GnomeQS when you sign in."
+msgstr "Inicia o GnomeQS ao entrar na sessão."
+
 msgid "Keep running on close"
 msgstr "Manter rodando ao fechar"
 
+msgid "Continue receiving files in the background."
+msgstr "Continua recebendo arquivos em segundo plano."
+
 msgid "Start minimized"
 msgstr "Iniciar minimizado"
+
+msgid "Open directly in the tray."
+msgstr "Abre diretamente na bandeja."
+
+msgid "Window"
+msgstr "Janela"
+
+msgid "Remember window size"
+msgstr "Lembrar tamanho da janela"
+
+msgid "Restore the last size and maximized state when opening the app."
+msgstr "Restaura o último tamanho e o estado maximizado ao abrir o app."
+
+msgid "Reset window size"
+msgstr "Redefinir tamanho da janela"
+
+msgid "Return to the default window size."
+msgstr "Volta para o tamanho padrão da janela."
+
+msgid "Reset"
+msgstr "Redefinir"
+
+msgid "Window size reset"
+msgstr "Tamanho da janela redefinido"
+
+msgid "Could not reset window size"
+msgstr "Não foi possível redefinir o tamanho da janela"
 
 msgid "Theme"
 msgstr "Tema"
@@ -192,6 +225,9 @@ msgstr "Versão"
 
 msgid "Monochrome tray icon"
 msgstr "Ícone da tray monocromático"
+
+msgid "Use a black or white tray icon that fits the system theme."
+msgstr "Usa um ícone preto ou branco na bandeja que combina com o tema do sistema."
 
 msgid "Port"
 msgstr "Porta"
@@ -252,6 +288,81 @@ msgstr "Português (Brasil)"
 
 msgid "Download folder"
 msgstr "Pasta de download"
+
+msgid "Default"
+msgstr "Padrão"
+
+msgid "Reset to default"
+msgstr "Redefinir para o padrão"
+
+msgid "Download folder reset"
+msgstr "Pasta de download redefinida"
+
+msgid "Clear transfer history"
+msgstr "Limpar histórico de transferências"
+
+msgid "Remove all locally stored transfer history."
+msgstr "Remove todo o histórico de transferências armazenado localmente."
+
+msgid "Remove all sent and received transfer history stored locally."
+msgstr "Remove todo o histórico de envio e recebimento armazenado localmente."
+
+msgid "Transfer history cleared"
+msgstr "Histórico de transferências limpo"
+
+msgid "Could not clear transfer history"
+msgstr "Não foi possível limpar o histórico de transferências"
+
+msgid "Clear all transfer history?"
+msgstr "Limpar todo o histórico de transferências?"
+
+msgid "This will remove all sent and received transfer history stored locally."
+msgstr "Isso removerá todo o histórico de envio e recebimento armazenado localmente."
+
+msgid "Clear all"
+msgstr "Limpar tudo"
+
+msgid "Remove all receive history."
+msgstr "Remove todo o histórico de recebimento."
+
+msgid "Remove all send history."
+msgstr "Remove todo o histórico de envio."
+
+msgid "Remove"
+msgstr "Remover"
+
+msgid "No history yet"
+msgstr "Nenhum histórico ainda"
+
+msgid "History item removed"
+msgstr "Item do histórico removido"
+
+msgid "Could not remove history item"
+msgstr "Não foi possível remover o item do histórico"
+
+msgid "Clear receive history?"
+msgstr "Limpar histórico de recebimento?"
+
+msgid "This will remove all received transfer history stored locally."
+msgstr "Isso removerá todo o histórico de recebimento armazenado localmente."
+
+msgid "Receive history cleared"
+msgstr "Histórico de recebimento limpo"
+
+msgid "Could not clear receive history"
+msgstr "Não foi possível limpar o histórico de recebimento"
+
+msgid "Clear send history?"
+msgstr "Limpar histórico de envio?"
+
+msgid "This will remove all sent transfer history stored locally."
+msgstr "Isso removerá todo o histórico de envio armazenado localmente."
+
+msgid "Send history cleared"
+msgstr "Histórico de envio limpo"
+
+msgid "Could not clear send history"
+msgstr "Não foi possível limpar o histórico de envio"
 
 msgid "Refresh"
 msgstr "Atualizar"

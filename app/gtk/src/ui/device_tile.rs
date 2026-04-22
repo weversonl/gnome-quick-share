@@ -97,7 +97,15 @@ impl DeviceTile {
             _ => endpoint.ip.is_some() && endpoint.port.is_some(),
         };
         button.set_sensitive(interactive);
-        button.set_tooltip_text(Some(&format!("{name}\n{transport_text}")));
+        let tooltip = if matches!(endpoint.transport, Some(EndpointTransport::BleDiscovery)) {
+            format!(
+                "{name}\n{transport_text}\n{}",
+                tr!("Requires Wi-Fi or Wi-Fi Direct to transfer")
+            )
+        } else {
+            format!("{name}\n{transport_text}")
+        };
+        button.set_tooltip_text(Some(&tooltip));
         if interactive {
             set_pointer_cursor(&button);
         }
@@ -120,6 +128,11 @@ fn transport_visual(endpoint: &EndpointInfo) -> (String, &'static str, &'static 
             tr!("Wi-Fi Direct"),
             "io.github.weversonl.GnomeQuickShare-airdrop-symbolic",
             "transport-wifi-direct",
+        ),
+        Some(EndpointTransport::BleDiscovery) => (
+            tr!("Bluetooth"),
+            "bluetooth-symbolic",
+            "transport-bluetooth",
         ),
         _ => (tr!("Wi-Fi"), "network-wireless-symbolic", "transport-wifi"),
     }

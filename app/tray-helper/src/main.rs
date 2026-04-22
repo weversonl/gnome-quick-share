@@ -11,6 +11,8 @@ const STATUS_ENV: &str = "GNOMEQS_TRAY_STATUS";
 const LANG_ENV: &str = "GNOMEQS_TRAY_LANG";
 const MONO_ENV: &str = "GNOMEQS_TRAY_MONO";
 const TRAY_ICON: &str = "io.github.weversonl.GnomeQuickShare-airdrop-symbolic";
+const TRAY_ICON_DARK: &str = "io.github.weversonl.GnomeQuickShare-tray-dark-symbolic";
+const TRAY_ICON_LIGHT: &str = "io.github.weversonl.GnomeQuickShare-tray-light-symbolic";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Visibility {
@@ -26,18 +28,21 @@ fn main() -> anyhow::Result<()> {
     let socket_path = PathBuf::from(env::var(SOCKET_ENV)?);
     let status_path = PathBuf::from(env::var(STATUS_ENV)?);
     let lang = env::var(LANG_ENV).unwrap_or_else(|_| "en".into());
-    let _monochrome = env::var(MONO_ENV).map(|v| v == "1").unwrap_or(false);
+    let monochrome = env::var(MONO_ENV).map(|v| v == "1").unwrap_or(false);
     let icon_theme_path = icon_theme_root();
+    let tray_icon = tray_icon_name(monochrome);
 
-    let mut indicator =
-        AppIndicator::with_path("io.github.weversonl.GnomeQuickShare", TRAY_ICON, &icon_theme_path);
+    let mut indicator = AppIndicator::with_path(
+        "io.github.weversonl.GnomeQuickShare",
+        tray_icon,
+        &icon_theme_path,
+    );
     indicator.set_title("GnomeQS");
     indicator.set_status(AppIndicatorStatus::Active);
     indicator.set_icon_theme_path(&icon_theme_path);
-    indicator.set_icon(TRAY_ICON);
+    indicator.set_icon(tray_icon);
 
-    let (show_label, quit_label, visible_label, hidden_label, temporary_label) =
-        tray_labels(&lang);
+    let (show_label, quit_label, visible_label, hidden_label, temporary_label) = tray_labels(&lang);
 
     let mut menu = gtk3::Menu::new();
 
@@ -79,11 +84,20 @@ fn main() -> anyhow::Result<()> {
     menu.show_all();
     indicator.set_menu(&mut menu);
 
+    let mut current_icon = tray_icon;
     glib::timeout_add_local(Duration::from_millis(250), move || {
         if !status_path.exists() {
             indicator.set_status(AppIndicatorStatus::Passive);
             gtk3::main_quit();
             return glib::ControlFlow::Break;
+        }
+
+        if monochrome {
+            let next_icon = tray_icon_name(true);
+            if next_icon != current_icon {
+                indicator.set_icon(next_icon);
+                current_icon = next_icon;
+            }
         }
 
         if let Some(vis) = read_visibility_status(&status_path) {
@@ -117,6 +131,21 @@ fn icon_theme_root() -> String {
     #[cfg(not(debug_assertions))]
     {
         "/usr/share/icons".to_string()
+    }
+}
+
+fn tray_icon_name(monochrome: bool) -> &'static str {
+    if !monochrome {
+        return TRAY_ICON;
+    }
+
+    if gtk3::Settings::default()
+        .map(|settings| settings.property::<bool>("gtk-application-prefer-dark-theme"))
+        .unwrap_or(false)
+    {
+        TRAY_ICON_LIGHT
+    } else {
+        TRAY_ICON_DARK
     }
 }
 

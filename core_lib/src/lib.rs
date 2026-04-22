@@ -8,10 +8,12 @@ use anyhow::anyhow;
 use channel::ChannelMessage;
 #[cfg(all(feature = "experimental", target_os = "linux"))]
 use hdl::BleAdvertiser;
+#[cfg(feature = "experimental")]
+use hdl::BleDiscovery;
 use hdl::MDnsDiscovery;
 use once_cell::sync::Lazy;
-use rand::distr::Alphanumeric;
 use rand::Rng;
+use rand::distr::Alphanumeric;
 use tokio::net::TcpListener;
 use tokio::sync::{broadcast, mpsc, watch};
 use tokio_util::sync::CancellationToken;
@@ -29,14 +31,14 @@ mod manager;
 mod utils;
 mod wifi_direct;
 
-pub use hdl::{EndpointInfo, EndpointTransport, OutboundPayload, State, Visibility};
 pub use hdl::info::TransferMetadata;
+pub use hdl::{EndpointInfo, EndpointTransport, OutboundPayload, State, Visibility};
 pub use manager::SendInfo;
 pub use utils::{DeviceType, RemoteDeviceInfo};
 pub use wifi_direct::{
-    WifiDirectBackend, WifiDirectCapability, WifiDirectStatus, activate_wifi_direct_peer,
-    detect_wifi_direct_capability, run_wifi_direct_discovery, wait_for_wifi_direct_session,
-    WifiDirectSessionInfo,
+    WifiDirectBackend, WifiDirectCapability, WifiDirectSessionInfo, WifiDirectStatus,
+    activate_wifi_direct_peer, detect_wifi_direct_capability, run_wifi_direct_discovery,
+    wait_for_wifi_direct_session,
 };
 
 pub mod sharing_nearby {
@@ -189,6 +191,22 @@ impl RQS {
 
                 if let Err(e) = blea.run(ctk_blea).await {
                     error!("Couldn't start BleAdvertiser: {}", e);
+                }
+            });
+        }
+
+        #[cfg(feature = "experimental")]
+        {
+            let ble_sender = sender.clone();
+            let ctk_bled = ctk.clone();
+            tracker.spawn(async move {
+                match BleDiscovery::new(ble_sender).await {
+                    Ok(ble) => {
+                        if let Err(e) = ble.run(ctk_bled).await {
+                            error!("BleDiscovery error: {}", e);
+                        }
+                    }
+                    Err(e) => error!("Couldn't init BleDiscovery: {}", e),
                 }
             });
         }

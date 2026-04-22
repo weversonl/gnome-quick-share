@@ -26,17 +26,15 @@ Many implementation and product decisions in GnomeQS were informed by the work b
 - Rust 2024 edition
 - GTK4
 - libadwaita
-- Tokio
 - gettext-rs
 - Protocol Buffers via `prost`
 - mDNS discovery via `mdns-sd`
-- Bluetooth support via Linux-specific crates such as `bluer` and `btleplug`
 - Ayatana AppIndicator for the tray helper
 - Meson as the build and install system
 
 ## Project Structure
 
-- [`core_lib`](./core_lib): transfer logic, discovery, networking, Bluetooth, inbound/outbound flow
+- [`core_lib`](./core_lib): transfer logic, discovery, networking, inbound/outbound flow
 - [`app/gtk`](./app/gtk): GTK4/libadwaita application
 - [`app/tray-helper`](./app/tray-helper): tray helper process
 - [`build-aux`](./build-aux): build helper scripts used by Meson

@@ -2,14 +2,15 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
-use gtk4::prelude::*;
 use gio::prelude::SettingsExt;
+use gtk4::prelude::*;
 use libadwaita::prelude::*;
 
 use crate::bridge::FromUi;
+use crate::config::VERSION;
 use crate::settings;
 use crate::tr;
-use crate::config::VERSION;
+use crate::transfer_history;
 use crate::ui::cursor::set_pointer_cursor;
 use crate::ui::window::apply_custom_css;
 use gnomeqs_core::{WifiDirectStatus, detect_wifi_direct_capability};
@@ -17,16 +18,23 @@ use gnomeqs_core::{WifiDirectStatus, detect_wifi_direct_capability};
 pub fn build_settings_window(
     parent: &impl gtk4::prelude::IsA<gtk4::Window>,
     from_ui_tx: async_channel::Sender<FromUi>,
+    on_history_cleared: Rc<dyn Fn()>,
 ) -> libadwaita::PreferencesDialog {
     let win = libadwaita::PreferencesDialog::new();
     let app = parent
         .application()
         .and_then(|app| app.downcast::<libadwaita::Application>().ok());
+    let parent_window = parent.as_ref().clone();
     win.set_title(&tr!("Settings"));
     win.set_search_enabled(false);
     register_window_actions(&win, app);
 
-    win.add(&build_general_page(&from_ui_tx, &win));
+    win.add(&build_general_page(
+        &from_ui_tx,
+        &on_history_cleared,
+        &win,
+        &parent_window,
+    ));
     win.add(&build_about_page());
 
     win
@@ -34,28 +42,34 @@ pub fn build_settings_window(
 
 fn build_general_page(
     from_ui_tx: &async_channel::Sender<FromUi>,
+    on_history_cleared: &Rc<dyn Fn()>,
     win: &libadwaita::PreferencesDialog,
+    parent: &gtk4::Window,
 ) -> libadwaita::PreferencesPage {
     let page = libadwaita::PreferencesPage::new();
     page.set_title(&tr!("General"));
     page.set_icon_name(Some("preferences-system-symbolic"));
 
     page.add(&build_behavior_group(from_ui_tx));
+    page.add(&build_window_group(win, parent));
     page.add(&build_appearance_group(win));
     page.add(&build_files_group(from_ui_tx, win));
-    page.add(&build_history_group());
+    page.add(&build_history_group(win, on_history_cleared));
     page.add(&build_network_group(win));
 
     page
 }
 
-fn build_behavior_group(_from_ui_tx: &async_channel::Sender<FromUi>) -> libadwaita::PreferencesGroup {
+fn build_behavior_group(
+    _from_ui_tx: &async_channel::Sender<FromUi>,
+) -> libadwaita::PreferencesGroup {
     let group = libadwaita::PreferencesGroup::new();
     group.set_title(&tr!("Behavior"));
     let gsettings = settings();
 
     let autostart = libadwaita::SwitchRow::new();
     autostart.set_title(&tr!("Start on boot"));
+    autostart.set_subtitle(&tr!("Launch GnomeQS when you sign in."));
     autostart.set_active(settings::get_autostart());
     set_pointer_cursor(&autostart);
     {
@@ -72,25 +86,86 @@ fn build_behavior_group(_from_ui_tx: &async_channel::Sender<FromUi>) -> libadwai
 
     let keep_running = libadwaita::SwitchRow::new();
     keep_running.set_title(&tr!("Keep running on close"));
+    keep_running.set_subtitle(&tr!("Continue receiving files in the background."));
     keep_running.set_active(settings::get_keep_running_on_close());
     set_pointer_cursor(&keep_running);
-    gsettings.bind("keep-running-on-close", &keep_running, "active").build();
+    gsettings
+        .bind("keep-running-on-close", &keep_running, "active")
+        .build();
     group.add(&keep_running);
 
     let start_min = libadwaita::SwitchRow::new();
     start_min.set_title(&tr!("Start minimized"));
+    start_min.set_subtitle(&tr!("Open directly in the tray."));
     start_min.set_active(gsettings.boolean("start-minimized"));
     set_pointer_cursor(&start_min);
-    gsettings.bind("start-minimized", &start_min, "active").build();
+    gsettings
+        .bind("start-minimized", &start_min, "active")
+        .build();
     group.add(&start_min);
 
     let mono_tray = libadwaita::SwitchRow::new();
     mono_tray.set_title(&tr!("Monochrome tray icon"));
+    mono_tray.set_subtitle(&tr!(
+        "Use a black or white tray icon that fits the system theme."
+    ));
     mono_tray.set_active(gsettings.boolean("tray-monochrome"));
     set_pointer_cursor(&mono_tray);
-    gsettings.bind("tray-monochrome", &mono_tray, "active").build();
+    gsettings
+        .bind("tray-monochrome", &mono_tray, "active")
+        .build();
     group.add(&mono_tray);
 
+    group
+}
+
+fn build_window_group(
+    win: &libadwaita::PreferencesDialog,
+    parent: &gtk4::Window,
+) -> libadwaita::PreferencesGroup {
+    let group = libadwaita::PreferencesGroup::new();
+    group.set_title(&tr!("Window"));
+    let gsettings = settings();
+
+    let remember_size = libadwaita::SwitchRow::new();
+    remember_size.set_title(&tr!("Remember window size"));
+    remember_size.set_subtitle(&tr!(
+        "Restore the last size and maximized state when opening the app."
+    ));
+    remember_size.set_active(settings::get_remember_window_size());
+    set_pointer_cursor(&remember_size);
+    gsettings
+        .bind("remember-window-size", &remember_size, "active")
+        .build();
+    group.add(&remember_size);
+
+    let reset_row = libadwaita::ActionRow::new();
+    reset_row.set_title(&tr!("Reset window size"));
+    reset_row.set_subtitle(&tr!("Return to the default window size."));
+
+    let reset_btn = gtk4::Button::from_icon_name("view-restore-symbolic");
+    reset_btn.add_css_class("flat");
+    reset_btn.set_tooltip_text(Some(&tr!("Reset")));
+    reset_btn.set_valign(gtk4::Align::Center);
+    set_pointer_cursor(&reset_btn);
+    reset_row.add_suffix(&reset_btn);
+    reset_row.set_activatable_widget(Some(&reset_btn));
+
+    {
+        let win = win.clone();
+        let parent = parent.clone();
+        reset_btn.connect_clicked(move |_| {
+            match parent.activate_action("win.reset-window-size", None) {
+                Ok(()) => win.add_toast(libadwaita::Toast::new(&tr!("Window size reset"))),
+                Err(e) => {
+                    log::warn!("reset window size action failed: {e}");
+                    win.add_toast(libadwaita::Toast::new(&tr!("Could not reset window size")));
+                }
+            }
+        });
+    }
+
+    group.add(&reset_row);
     group
 }
 
@@ -108,9 +183,9 @@ fn build_appearance_group(win: &libadwaita::PreferencesDialog) -> libadwaita::Pr
     theme_row.set_model(Some(&theme_model));
     let current_scheme = gsettings.string("color-scheme");
     theme_row.set_selected(match current_scheme.as_str() {
-        "light"  => 1,
-        "dark"   => 2,
-        _        => 0,
+        "light" => 1,
+        "dark" => 2,
+        _ => 0,
     });
     {
         let gsettings = gsettings.clone();
@@ -137,7 +212,7 @@ fn build_appearance_group(win: &libadwaita::PreferencesDialog) -> libadwaita::Pr
     let current_lang = gsettings.string("language");
     lang_row.set_selected(match current_lang.as_str() {
         "pt_BR" => 1,
-        _       => 0,
+        _ => 0,
     });
     {
         let gsettings = gsettings.clone();
@@ -153,7 +228,12 @@ fn build_appearance_group(win: &libadwaita::PreferencesDialog) -> libadwaita::Pr
     }
     group.add(&lang_row);
 
-    let font_items = vec![tr!("Small"), tr!("Normal"), tr!("Large"), tr!("Extra large")];
+    let font_items = vec![
+        tr!("Small"),
+        tr!("Normal"),
+        tr!("Large"),
+        tr!("Extra large"),
+    ];
     let font_item_refs: Vec<&str> = font_items.iter().map(String::as_str).collect();
     let font_row = libadwaita::ComboRow::new();
     font_row.set_title(&tr!("Font size"));
@@ -176,7 +256,7 @@ fn build_appearance_group(win: &libadwaita::PreferencesDialog) -> libadwaita::Pr
 
 fn build_files_group(
     from_ui_tx: &async_channel::Sender<FromUi>,
-    _win: &libadwaita::PreferencesDialog,
+    win: &libadwaita::PreferencesDialog,
 ) -> libadwaita::PreferencesGroup {
     let group = libadwaita::PreferencesGroup::new();
     group.set_title(&tr!("Files"));
@@ -184,12 +264,11 @@ fn build_files_group(
     let folder_row = libadwaita::ActionRow::new();
     folder_row.set_title(&tr!("Download folder"));
     let current = settings::get_download_folder();
-    folder_row.set_subtitle(
-        current.as_ref()
-            .map(|p| p.to_string_lossy().into_owned())
-            .as_deref()
-            .unwrap_or("Default"),
-    );
+    let folder_subtitle = current
+        .as_ref()
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_else(|| tr!("Default"));
+    folder_row.set_subtitle(&folder_subtitle);
 
     let pick_btn = gtk4::Button::from_icon_name("folder-open-symbolic");
     pick_btn.add_css_class("flat");
@@ -198,21 +277,32 @@ fn build_files_group(
     folder_row.add_suffix(&pick_btn);
     folder_row.set_activatable_widget(Some(&pick_btn));
 
+    let reset_btn = gtk4::Button::from_icon_name("edit-clear-symbolic");
+    reset_btn.add_css_class("flat");
+    reset_btn.set_tooltip_text(Some(&tr!("Reset to default")));
+    reset_btn.set_valign(gtk4::Align::Center);
+    reset_btn.set_sensitive(current.is_some());
+    set_pointer_cursor(&reset_btn);
+    folder_row.add_suffix(&reset_btn);
+
     {
         let tx = from_ui_tx.clone();
         let row = folder_row.clone();
+        let reset_btn = reset_btn.clone();
         pick_btn.connect_clicked(move |btn| {
             let window = btn.root().and_downcast::<gtk4::Window>();
             let dialog = gtk4::FileDialog::new();
             dialog.set_title(&tr!("Change download folder"));
             let tx2 = tx.clone();
             let row2 = row.clone();
+            let reset_btn = reset_btn.clone();
             dialog.select_folder(window.as_ref(), gio::Cancellable::NONE, move |result| {
                 if let Ok(file) = result {
                     if let Some(path) = file.path() {
                         let path_str = path.to_string_lossy().into_owned();
                         row2.set_subtitle(&path_str);
                         let _ = settings().set_string("download-folder", &path_str);
+                        reset_btn.set_sensitive(true);
                         if let Err(e) = tx2.try_send(FromUi::ChangeDownloadPath(Some(path))) {
                             log::warn!("ChangeDownloadPath: {e}");
                         }
@@ -222,11 +312,30 @@ fn build_files_group(
         });
     }
 
+    {
+        let tx = from_ui_tx.clone();
+        let row = folder_row.clone();
+        let reset_btn = reset_btn.clone();
+        let win = win.clone();
+        reset_btn.clone().connect_clicked(move |_| {
+            let _ = settings().set_string("download-folder", "");
+            row.set_subtitle(&tr!("Default"));
+            reset_btn.set_sensitive(false);
+            if let Err(e) = tx.try_send(FromUi::ChangeDownloadPath(None)) {
+                log::warn!("ChangeDownloadPath reset: {e}");
+            }
+            win.add_toast(libadwaita::Toast::new(&tr!("Download folder reset")));
+        });
+    }
+
     group.add(&folder_row);
     group
 }
 
-fn build_history_group() -> libadwaita::PreferencesGroup {
+fn build_history_group(
+    win: &libadwaita::PreferencesDialog,
+    on_history_cleared: &Rc<dyn Fn()>,
+) -> libadwaita::PreferencesGroup {
     let group = libadwaita::PreferencesGroup::new();
     group.set_title(&tr!("History"));
     group.set_description(Some(&tr!(
@@ -274,7 +383,63 @@ fn build_history_group() -> libadwaita::PreferencesGroup {
         .build();
     group.add(&max_items_row);
 
+    let clear_row = libadwaita::ActionRow::new();
+    clear_row.set_title(&tr!("Clear transfer history"));
+    clear_row.set_subtitle(&tr!(
+        "Remove all sent and received transfer history stored locally."
+    ));
+
+    let clear_btn = gtk4::Button::from_icon_name("user-trash-symbolic");
+    clear_btn.add_css_class("flat");
+    clear_btn.add_css_class("destructive-action");
+    clear_btn.set_tooltip_text(Some(&tr!("Clear")));
+    clear_btn.set_valign(gtk4::Align::Center);
+    set_pointer_cursor(&clear_btn);
+    clear_row.add_suffix(&clear_btn);
+    clear_row.set_activatable_widget(Some(&clear_btn));
+
+    {
+        let win = win.clone();
+        let on_history_cleared = Rc::clone(on_history_cleared);
+        clear_btn.connect_clicked(move |btn| {
+            let win = win.clone();
+            let on_history_cleared = Rc::clone(&on_history_cleared);
+            confirm_clear_all_history(btn, move || match transfer_history::clear() {
+                Ok(()) => {
+                    on_history_cleared();
+                    win.add_toast(libadwaita::Toast::new(&tr!("Transfer history cleared")));
+                }
+                Err(e) => {
+                    log::warn!("failed to clear transfer history: {e}");
+                    win.add_toast(libadwaita::Toast::new(&tr!(
+                        "Could not clear transfer history"
+                    )));
+                }
+            });
+        });
+    }
+
+    group.add(&clear_row);
+
     group
+}
+
+fn confirm_clear_all_history(parent: &impl IsA<gtk4::Widget>, on_confirm: impl Fn() + 'static) {
+    let alert = libadwaita::AlertDialog::new(
+        Some(&tr!("Clear all transfer history?")),
+        Some(&tr!(
+            "This will remove all sent and received transfer history stored locally."
+        )),
+    );
+    alert.add_responses(&[("cancel", &tr!("Cancel")), ("clear", &tr!("Clear all"))]);
+    alert.set_default_response(Some("cancel"));
+    alert.set_close_response("cancel");
+    alert.set_response_appearance("clear", libadwaita::ResponseAppearance::Destructive);
+    alert.choose(parent, None::<&gio::Cancellable>, move |response| {
+        if response.as_str() == "clear" {
+            on_confirm();
+        }
+    });
 }
 
 fn build_network_group(win: &libadwaita::PreferencesDialog) -> libadwaita::PreferencesGroup {
@@ -334,7 +499,9 @@ fn build_network_group(win: &libadwaita::PreferencesDialog) -> libadwaita::Prefe
 
     if wifi_direct.available {
         set_pointer_cursor(&wifi_row);
-        gsettings.bind("wifi-direct-enabled", &wifi_row, "active").build();
+        gsettings
+            .bind("wifi-direct-enabled", &wifi_row, "active")
+            .build();
     } else {
         let _ = gsettings.set_boolean("wifi-direct-enabled", false);
     }
@@ -369,19 +536,27 @@ fn wifi_direct_subtitle(capability: &gnomeqs_core::WifiDirectCapability) -> Stri
             tr!("Your device is not compatible with Wi-Fi Direct via NetworkManager.")
         }
         WifiDirectStatus::BackendNotRunning => {
-            tr!("Your device is not compatible with Wi-Fi Direct right now because NetworkManager is not running.")
+            tr!(
+                "Your device is not compatible with Wi-Fi Direct right now because NetworkManager is not running."
+            )
         }
         WifiDirectStatus::BackendQueryFailed => {
             tr!("Your device compatibility with Wi-Fi Direct could not be verified right now.")
         }
         WifiDirectStatus::NoWifiInterface => {
-            tr!("Your device is not compatible with Wi-Fi Direct because no Wi-Fi interface was detected.")
+            tr!(
+                "Your device is not compatible with Wi-Fi Direct because no Wi-Fi interface was detected."
+            )
         }
         WifiDirectStatus::WifiInterfaceUnavailable => {
-            tr!("Your device is not compatible with Wi-Fi Direct right now because the Wi-Fi interface is unavailable.")
+            tr!(
+                "Your device is not compatible with Wi-Fi Direct right now because the Wi-Fi interface is unavailable."
+            )
         }
         WifiDirectStatus::NoP2pInterface => {
-            tr!("Your device is not compatible with Wi-Fi Direct because no P2P interface was detected.")
+            tr!(
+                "Your device is not compatible with Wi-Fi Direct because no P2P interface was detected."
+            )
         }
         WifiDirectStatus::P2pInterfaceUnavailable => {
             tr!("Your device is compatible with Wi-Fi Direct through NetworkManager.")

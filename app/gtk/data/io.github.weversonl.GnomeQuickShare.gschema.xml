@@ -24,6 +24,11 @@
       <summary>Use monochrome tray icon</summary>
     </key>
 
+    <key name="remember-window-size" type="b">
+      <default>true</default>
+      <summary>Remember the last window size</summary>
+    </key>
+
     <!-- Networking -->
     <!-- 0 = Visible, 1 = Invisible, 2 = Temporarily -->
     <key name="visibility" type="i">

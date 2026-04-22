@@ -6,6 +6,9 @@ use crate::config::APP_ID;
 #[cfg(debug_assertions)]
 use crate::config::SCHEMA_DIR;
 
+pub const DEFAULT_WINDOW_WIDTH: i32 = 400;
+pub const DEFAULT_WINDOW_HEIGHT: i32 = 650;
+
 thread_local! {
     static SETTINGS: RefCell<Option<gio::Settings>> = RefCell::new(None);
 }
@@ -38,6 +41,10 @@ pub fn get_start_minimized() -> bool {
     settings().boolean("start-minimized")
 }
 
+pub fn get_remember_window_size() -> bool {
+    settings().boolean("remember-window-size")
+}
+
 pub fn get_visibility_raw() -> i32 {
     settings().int("visibility")
 }
@@ -57,7 +64,11 @@ pub fn get_port() -> Option<u32> {
 
 pub fn get_download_folder() -> Option<std::path::PathBuf> {
     let s = settings().string("download-folder");
-    if s.is_empty() { None } else { Some(std::path::PathBuf::from(s.as_str())) }
+    if s.is_empty() {
+        None
+    } else {
+        Some(std::path::PathBuf::from(s.as_str()))
+    }
 }
 
 pub fn get_language() -> String {
@@ -110,13 +121,21 @@ pub fn apply_color_scheme() {
     let scheme = settings().string("color-scheme");
     let cs = match scheme.as_str() {
         "light" => libadwaita::ColorScheme::ForceLight,
-        "dark"  => libadwaita::ColorScheme::ForceDark,
-        _       => libadwaita::ColorScheme::Default,
+        "dark" => libadwaita::ColorScheme::ForceDark,
+        _ => libadwaita::ColorScheme::Default,
     };
     libadwaita::StyleManager::default().set_color_scheme(cs);
 }
 
 pub fn save_window_state(width: i32, height: i32, maximized: bool) {
+    if !get_remember_window_size() {
+        return;
+    }
+
+    save_window_state_unchecked(width, height, maximized);
+}
+
+pub fn save_window_state_unchecked(width: i32, height: i32, maximized: bool) {
     let s = settings();
     let _ = s.set_int("window-width", width);
     let _ = s.set_int("window-height", height);
@@ -124,10 +143,18 @@ pub fn save_window_state(width: i32, height: i32, maximized: bool) {
 }
 
 pub fn window_state() -> (i32, i32, bool) {
+    if !get_remember_window_size() {
+        return (DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, false);
+    }
+
     let s = settings();
     (
         s.int("window-width"),
         s.int("window-height"),
         s.boolean("window-maximized"),
     )
+}
+
+pub fn reset_window_state() {
+    save_window_state_unchecked(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, false);
 }

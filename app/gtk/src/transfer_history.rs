@@ -30,14 +30,49 @@ pub fn load(direction: HistoryDirection) -> Vec<HistoryEntry> {
         .collect()
 }
 
-pub fn append(mut entry: HistoryEntry) {
+pub fn append(mut entry: HistoryEntry) -> HistoryEntry {
     entry.created_at = unix_now();
     let mut entries = prune_entries(read_all());
-    entries.insert(0, entry);
+    entries.insert(0, entry.clone());
     entries = prune_entries(entries);
 
     if let Err(e) = write_all(&entries) {
         log::warn!("failed to write transfer history: {e}");
+    }
+
+    entry
+}
+
+pub fn remove(target: &HistoryEntry) -> anyhow::Result<()> {
+    let mut removed = false;
+    let entries: Vec<HistoryEntry> = read_all()
+        .into_iter()
+        .filter(|entry| {
+            if !removed && history_entry_matches(entry, target) {
+                removed = true;
+                false
+            } else {
+                true
+            }
+        })
+        .collect();
+    write_or_remove_all(&entries)
+}
+
+pub fn clear_direction(direction: HistoryDirection) -> anyhow::Result<()> {
+    let entries: Vec<HistoryEntry> = read_all()
+        .into_iter()
+        .filter(|entry| entry.direction != direction)
+        .collect();
+    write_or_remove_all(&entries)
+}
+
+pub fn clear() -> anyhow::Result<()> {
+    let path = history_path();
+    match std::fs::remove_file(&path) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e.into()),
     }
 }
 
@@ -79,6 +114,22 @@ fn write_all(entries: &[HistoryEntry]) -> anyhow::Result<()> {
     }
     std::fs::write(path, serde_json::to_vec_pretty(entries)?)?;
     Ok(())
+}
+
+fn write_or_remove_all(entries: &[HistoryEntry]) -> anyhow::Result<()> {
+    if entries.is_empty() {
+        return clear();
+    }
+
+    write_all(entries)
+}
+
+fn history_entry_matches(entry: &HistoryEntry, target: &HistoryEntry) -> bool {
+    entry.created_at == target.created_at
+        && entry.direction == target.direction
+        && entry.title == target.title
+        && entry.subtitle == target.subtitle
+        && entry.open_target == target.open_target
 }
 
 fn history_path() -> PathBuf {

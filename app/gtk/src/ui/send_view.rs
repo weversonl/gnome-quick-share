@@ -40,6 +40,18 @@ pub struct SendView {
     pending_start: Rc<RefCell<Option<glib::SourceId>>>,
     pending_wifi_direct_send: Rc<RefCell<Option<PendingWifiDirectSend>>>,
     known_mdns_endpoints: Rc<RefCell<HashMap<String, KnownMdnsEndpoint>>>,
+    history_controls: SendHistoryControls,
+}
+
+#[derive(Clone)]
+struct SendHistoryControls {
+    history_button: gtk4::Button,
+    transfer_header: gtk4::Box,
+    transfers_heading: gtk4::Label,
+    clear_all_row: libadwaita::ActionRow,
+    clear_all_btn: gtk4::Button,
+    stack: gtk4::Stack,
+    toast_overlay: libadwaita::ToastOverlay,
 }
 
 #[derive(Debug, Clone)]
@@ -65,7 +77,10 @@ struct RetryRequest {
 }
 
 impl SendView {
-    pub fn new(from_ui_tx: async_channel::Sender<FromUi>) -> Self {
+    pub fn new(
+        from_ui_tx: async_channel::Sender<FromUi>,
+        toast_overlay: libadwaita::ToastOverlay,
+    ) -> Self {
         let root = gtk4::Box::new(gtk4::Orientation::Vertical, 0);
         root.set_vexpand(true);
 
@@ -219,7 +234,18 @@ impl SendView {
         recent_list.set_margin_start(0);
         recent_list.set_margin_end(0);
 
-        let history_dialog = build_history_dialog(&tr!("Send history"), &recent_list);
+        let history_controls = SendHistoryControls {
+            history_button: history_button.clone(),
+            transfer_header: transfer_header.clone(),
+            transfers_heading: transfers_heading.clone(),
+            clear_all_row: libadwaita::ActionRow::new(),
+            clear_all_btn: gtk4::Button::from_icon_name("user-trash-symbolic"),
+            stack: gtk4::Stack::new(),
+            toast_overlay: toast_overlay.clone(),
+        };
+
+        let history_dialog =
+            build_history_dialog(&tr!("Send history"), &recent_list, &history_controls);
         {
             let history_dialog = history_dialog.clone();
             history_button.connect_clicked(move |btn| {
@@ -229,12 +255,7 @@ impl SendView {
                 history_dialog.present(Some(&window));
             });
         }
-        load_send_history(
-            &recent_list,
-            &history_button,
-            &transfer_header,
-            &transfers_heading,
-        );
+        load_send_history(&recent_list, &history_controls);
 
         {
             let selected_files = Rc::clone(&selected_files);
@@ -448,6 +469,7 @@ impl SendView {
             pending_start,
             pending_wifi_direct_send,
             known_mdns_endpoints,
+            history_controls,
         }
     }
 
@@ -469,7 +491,8 @@ impl SendView {
         }
 
         let is_wifi_direct_peer = matches!(info.transport, Some(EndpointTransport::WifiDirectPeer));
-        if !is_wifi_direct_peer && (info.ip.is_none() || info.port.is_none()) {
+        let is_ble_only = matches!(info.transport, Some(EndpointTransport::BleDiscovery));
+        if !is_wifi_direct_peer && !is_ble_only && (info.ip.is_none() || info.port.is_none()) {
             log::debug!(
                 "ignoring incomplete endpoint update: id={} name={:?} transport={:?}",
                 info.id,
@@ -634,40 +657,40 @@ impl SendView {
                 let sent_requests = Rc::clone(&self.sent_requests);
                 let transfers_heading = self.transfers_heading.clone();
                 let transfer_header = self.transfer_header.clone();
-                let history_button = self.history_button.clone();
+                let history_controls = self.history_controls.clone();
                 let tx_history = self.from_ui_tx.clone();
                 row.connect_clear(move || {
                     let mut map = transfers.borrow_mut();
                     if let Some(row) = map.remove(&id) {
                         let (title, subtitle) = row.history_snapshot();
-                        let open_target = row.open_target_snapshot();
                         let retry_request = if history_allows_retry(&subtitle) {
                             sent_requests.borrow().get(&id).cloned()
                         } else {
                             None
                         };
                         list.remove(&row.row);
-                        prepend_history_row(
-                            &recent_list,
-                            &title,
-                            &subtitle,
-                            retry_request,
-                            open_target,
-                            tx_history.clone(),
-                        );
-                        transfer_history::append(HistoryEntry {
+                        let entry = transfer_history::append(HistoryEntry {
                             created_at: 0,
                             direction: HistoryDirection::Send,
                             title,
                             subtitle,
                             open_target: None,
                         });
-                        history_button.set_visible(true);
+                        prepend_history_row(
+                            &recent_list,
+                            entry,
+                            retry_request,
+                            tx_history.clone(),
+                            &history_controls,
+                        );
+                        history_controls.history_button.set_visible(true);
                     }
                     list.set_visible(!map.is_empty());
                     transfers_heading.set_visible(!map.is_empty());
-                    history_button.set_hexpand(map.is_empty());
-                    transfer_header.set_visible(!map.is_empty() || history_button.is_visible());
+                    history_controls.history_button.set_hexpand(map.is_empty());
+                    transfer_header.set_visible(
+                        !map.is_empty() || history_controls.history_button.is_visible(),
+                    );
                 });
             }
             if let Some(send_info) = self.sent_requests.borrow().get(&id).cloned() {
@@ -707,6 +730,19 @@ impl SendView {
                 _ => {}
             }
         }
+    }
+
+    pub fn clear_history(&self) {
+        clear_list_box(&self.recent_list);
+        update_history_controls(&self.recent_list, &self.history_controls);
+        self.update_transfer_header_visibility();
+    }
+
+    fn update_transfer_header_visibility(&self) {
+        let has_transfers = !self.transfers.borrow().is_empty();
+        self.transfers_heading.set_visible(has_transfers);
+        self.transfer_header
+            .set_visible(has_transfers || self.history_button.is_visible());
     }
 
     fn try_auto_send_pending_wifi_direct(&self, info: &EndpointInfo) {
@@ -965,7 +1001,11 @@ fn history_allows_retry(subtitle: &str) -> bool {
     )
 }
 
-fn build_history_dialog(title: &str, list: &gtk4::ListBox) -> libadwaita::PreferencesDialog {
+fn build_history_dialog(
+    title: &str,
+    list: &gtk4::ListBox,
+    controls: &SendHistoryControls,
+) -> libadwaita::PreferencesDialog {
     let dialog = libadwaita::PreferencesDialog::new();
     dialog.set_title(title);
     dialog.set_search_enabled(false);
@@ -974,12 +1014,47 @@ fn build_history_dialog(title: &str, list: &gtk4::ListBox) -> libadwaita::Prefer
     let group = libadwaita::PreferencesGroup::new();
     group.set_description(Some(&history_retention_notice()));
 
+    let clear_all_row = controls.clear_all_row.clone();
+    clear_all_row.set_title(&tr!("Clear all"));
+    clear_all_row.set_subtitle(&tr!("Remove all send history."));
+    let clear_all_btn = controls.clear_all_btn.clone();
+    clear_all_btn.add_css_class("flat");
+    clear_all_btn.add_css_class("destructive-action");
+    clear_all_btn.set_tooltip_text(Some(&tr!("Clear all")));
+    clear_all_btn.set_valign(gtk4::Align::Center);
+    set_pointer_cursor(&clear_all_btn);
+    clear_all_row.add_suffix(&clear_all_btn);
+    clear_all_row.set_activatable_widget(Some(&clear_all_btn));
+    {
+        let list = list.clone();
+        let controls = controls.clone();
+        clear_all_btn.connect_clicked(move |btn| {
+            let list = list.clone();
+            let controls = controls.clone();
+            confirm_clear_send_history(btn, move || {
+                if let Err(e) = transfer_history::clear_direction(HistoryDirection::Send) {
+                    log::warn!("failed to clear send history: {e}");
+                    add_history_toast(&controls, &tr!("Could not clear send history"));
+                    return;
+                }
+                clear_list_box(&list);
+                update_history_controls(&list, &controls);
+                add_history_toast(&controls, &tr!("Send history cleared"));
+            });
+        });
+    }
+    group.add(&clear_all_row);
+
+    let empty_state = build_history_empty_state();
+    controls.stack.add_named(list, Some("history"));
+    controls.stack.add_named(&empty_state, Some("empty"));
+
     let scroll = gtk4::ScrolledWindow::new();
     scroll.set_policy(gtk4::PolicyType::Never, gtk4::PolicyType::Automatic);
     scroll.set_min_content_width(300);
     scroll.set_min_content_height(220);
     scroll.set_max_content_height(420);
-    scroll.set_child(Some(list));
+    scroll.set_child(Some(&controls.stack));
 
     group.add(&scroll);
     page.add(&group);
@@ -992,44 +1067,34 @@ fn history_retention_notice() -> String {
         .replace("{}", &settings::get_history_retention_days().to_string())
 }
 
-fn load_send_history(
-    list: &gtk4::ListBox,
-    history_button: &gtk4::Button,
-    transfer_header: &gtk4::Box,
-    transfers_heading: &gtk4::Label,
-) {
+fn load_send_history(list: &gtk4::ListBox, controls: &SendHistoryControls) {
     let entries = transfer_history::load(HistoryDirection::Send);
     for entry in entries.into_iter().rev() {
-        prepend_history_row(
-            list,
-            &entry.title,
-            &entry.subtitle,
-            None,
-            entry.open_target,
-            async_channel::unbounded().0,
-        );
+        prepend_history_row(list, entry, None, async_channel::unbounded().0, controls);
     }
-    let has_history = list.first_child().is_some();
-    history_button.set_visible(has_history);
-    history_button.set_hexpand(has_history);
-    transfers_heading.set_visible(false);
-    transfer_header.set_visible(has_history);
+    controls.transfers_heading.set_visible(false);
+    update_history_controls(list, controls);
+}
+
+fn clear_list_box(list: &gtk4::ListBox) {
+    while let Some(child) = list.first_child() {
+        list.remove(&child);
+    }
 }
 
 fn prepend_history_row(
     list: &gtk4::ListBox,
-    title: &str,
-    subtitle: &str,
+    entry: HistoryEntry,
     retry_request: Option<RetryRequest>,
-    open_target: Option<String>,
     from_ui_tx: async_channel::Sender<FromUi>,
+    controls: &SendHistoryControls,
 ) {
     let row = gtk4::ListBoxRow::new();
     row.add_css_class("history-row");
-    let row_title = if title.is_empty() {
+    let row_title = if entry.title.is_empty() {
         tr!("Recent transfer")
     } else {
-        title.to_string()
+        entry.title.clone()
     };
 
     let body = gtk4::Box::new(gtk4::Orientation::Horizontal, 12);
@@ -1066,7 +1131,7 @@ fn prepend_history_row(
     title_label.set_xalign(0.0);
     title_label.set_ellipsize(gtk4::pango::EllipsizeMode::End);
 
-    let subtitle_label = gtk4::Label::new(Some(subtitle));
+    let subtitle_label = gtk4::Label::new(Some(&entry.subtitle));
     subtitle_label.add_css_class("history-subtitle");
     subtitle_label.set_halign(gtk4::Align::Start);
     subtitle_label.set_xalign(0.0);
@@ -1110,7 +1175,7 @@ fn prepend_history_row(
         body.append(&retry_btn);
     }
 
-    if let Some(path) = open_target {
+    if let Some(path) = entry.open_target.clone() {
         let show_btn = gtk4::Button::from_icon_name("folder-open-symbolic");
         show_btn.set_tooltip_text(Some(&tr!("Show folder")));
         show_btn.add_css_class("flat");
@@ -1134,6 +1199,32 @@ fn prepend_history_row(
         body.append(&show_btn);
     }
 
+    let remove_btn = gtk4::Button::from_icon_name("window-close-symbolic");
+    remove_btn.set_tooltip_text(Some(&tr!("Remove")));
+    remove_btn.add_css_class("flat");
+    remove_btn.add_css_class("destructive-action");
+    remove_btn.add_css_class("history-icon-button");
+    remove_btn.set_halign(gtk4::Align::Center);
+    remove_btn.set_valign(gtk4::Align::Center);
+    remove_btn.set_size_request(34, 34);
+    set_pointer_cursor(&remove_btn);
+    {
+        let list = list.clone();
+        let row = row.clone();
+        let controls = controls.clone();
+        remove_btn.connect_clicked(move |_| {
+            if let Err(e) = transfer_history::remove(&entry) {
+                log::warn!("failed to remove send history item: {e}");
+                add_history_toast(&controls, &tr!("Could not remove history item"));
+                return;
+            }
+            list.remove(&row);
+            update_history_controls(&list, &controls);
+            add_history_toast(&controls, &tr!("History item removed"));
+        });
+    }
+    body.append(&remove_btn);
+
     row.set_child(Some(&body));
     list.insert(&row, 0);
     list.set_visible(true);
@@ -1141,6 +1232,64 @@ fn prepend_history_row(
     while let Some(last) = list.row_at_index(6) {
         list.remove(&last);
     }
+    update_history_controls(list, controls);
+}
+
+fn update_history_controls(list: &gtk4::ListBox, controls: &SendHistoryControls) {
+    let has_history = list.first_child().is_some();
+    controls.history_button.set_visible(has_history);
+    controls.history_button.set_hexpand(has_history);
+    controls
+        .transfer_header
+        .set_visible(has_history || controls.transfers_heading.is_visible());
+    controls.clear_all_row.set_sensitive(has_history);
+    controls.clear_all_btn.set_sensitive(has_history);
+    controls
+        .stack
+        .set_visible_child_name(if has_history { "history" } else { "empty" });
+}
+
+fn build_history_empty_state() -> gtk4::Box {
+    let empty = gtk4::Box::new(gtk4::Orientation::Vertical, 8);
+    empty.set_vexpand(true);
+    empty.set_valign(gtk4::Align::Center);
+    empty.set_halign(gtk4::Align::Center);
+
+    let icon = gtk4::Image::from_icon_name("document-open-recent-symbolic");
+    icon.set_pixel_size(36);
+    icon.add_css_class("dim-label");
+
+    let label = gtk4::Label::new(Some(&tr!("No history yet")));
+    label.add_css_class("dim-label");
+    label.set_halign(gtk4::Align::Center);
+
+    empty.append(&icon);
+    empty.append(&label);
+    empty
+}
+
+fn add_history_toast(controls: &SendHistoryControls, message: &str) {
+    controls
+        .toast_overlay
+        .add_toast(libadwaita::Toast::new(message));
+}
+
+fn confirm_clear_send_history(parent: &impl IsA<gtk4::Widget>, on_confirm: impl Fn() + 'static) {
+    let alert = libadwaita::AlertDialog::new(
+        Some(&tr!("Clear send history?")),
+        Some(&tr!(
+            "This will remove all sent transfer history stored locally."
+        )),
+    );
+    alert.add_responses(&[("cancel", &tr!("Cancel")), ("clear", &tr!("Clear all"))]);
+    alert.set_default_response(Some("cancel"));
+    alert.set_close_response("cancel");
+    alert.set_response_appearance("clear", libadwaita::ResponseAppearance::Destructive);
+    alert.choose(parent, None::<&gio::Cancellable>, move |response| {
+        if response.as_str() == "clear" {
+            on_confirm();
+        }
+    });
 }
 
 fn rebuild_selected_files_ui(

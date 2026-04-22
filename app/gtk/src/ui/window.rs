@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use gtk4::gdk;
@@ -24,6 +24,8 @@ pub fn build_window(
     state: AppState,
 ) -> libadwaita::ApplicationWindow {
     let (width, height, maximized) = settings::window_state();
+    let windowed_width = Rc::new(Cell::new(width));
+    let windowed_height = Rc::new(Cell::new(height));
 
     apply_custom_css();
     register_debug_icon_search_path();
@@ -35,6 +37,8 @@ pub fn build_window(
         win.maximize();
     }
     win.add_css_class("app-window");
+    install_window_state_tracking(&win, &windowed_width, &windowed_height);
+    install_window_actions(&win, &windowed_width, &windowed_height);
     install_responsive_classes(&win);
     sync_theme_class(&win);
     {
@@ -72,7 +76,10 @@ pub fn build_window(
         state.from_ui_tx.clone(),
         toast_overlay.clone(),
     ));
-    let send_view = Rc::new(SendView::new(state.from_ui_tx.clone()));
+    let send_view = Rc::new(SendView::new(
+        state.from_ui_tx.clone(),
+        toast_overlay.clone(),
+    ));
 
     let _recv_page = stack.add_titled_with_icon(
         &receive_view.root,
@@ -234,20 +241,50 @@ pub fn build_window(
     {
         let win_clone = win.clone();
         let tx = state.from_ui_tx.clone();
+        let receive_view = Rc::clone(&receive_view);
+        let send_view = Rc::clone(&send_view);
         settings_btn.connect_clicked(move |_| {
-            let settings_win = build_settings_window(&win_clone, tx.clone());
+            let receive_view = Rc::clone(&receive_view);
+            let send_view = Rc::clone(&send_view);
+            let on_history_cleared: Rc<dyn Fn()> = Rc::new(move || {
+                receive_view.clear_history();
+                send_view.clear_history();
+            });
+            let settings_win = build_settings_window(&win_clone, tx.clone(), on_history_cleared);
             settings_win.present(Some(&win_clone));
         });
     }
 
-    win.connect_close_request(move |w| {
-        settings::save_window_state(w.width(), w.height(), w.is_maximized());
-        if settings::get_keep_running_on_close() {
-            w.set_visible(false);
-            return glib::Propagation::Stop;
-        }
-        glib::Propagation::Proceed
-    });
+    {
+        let windowed_width = Rc::clone(&windowed_width);
+        let windowed_height = Rc::clone(&windowed_height);
+        win.connect_close_request(move |w| {
+            persist_window_state(w, &windowed_width, &windowed_height);
+            if settings::get_keep_running_on_close() {
+                w.set_visible(false);
+                return glib::Propagation::Stop;
+            }
+            glib::Propagation::Proceed
+        });
+    }
+
+    // Stop all discovery when the window leaves the screen (tray, minimized, hidden).
+    {
+        let send_view_c = Rc::clone(&send_view);
+        win.connect_unmap(move |_| {
+            send_view_c.stop_discovery();
+        });
+    }
+    // Restart discovery if the send page is active when the window comes back.
+    {
+        let send_view_c = Rc::clone(&send_view);
+        let stack_c = stack.clone();
+        win.connect_map(move |_| {
+            if stack_c.visible_child_name().as_deref() == Some("send") {
+                send_view_c.start_discovery();
+            }
+        });
+    }
 
     let rx = state.to_ui_rx.clone();
     let win_weak = win.downgrade();
@@ -325,10 +362,18 @@ pub fn build_window(
                 ToUi::ShowSettings => {
                     win.set_visible(true);
                     win.present();
-                    let settings_win = build_settings_window(&win, from_ui_tx_clone.clone());
+                    let receive_view = Rc::clone(&receive_view_clone);
+                    let send_view = Rc::clone(&send_view_clone);
+                    let on_history_cleared: Rc<dyn Fn()> = Rc::new(move || {
+                        receive_view.clear_history();
+                        send_view.clear_history();
+                    });
+                    let settings_win =
+                        build_settings_window(&win, from_ui_tx_clone.clone(), on_history_cleared);
                     settings_win.present(Some(&win));
                 }
                 ToUi::Quit => {
+                    persist_window_state(&win, &windowed_width, &windowed_height);
                     if let Some(app) = win.application() {
                         app.quit();
                     }
@@ -339,6 +384,129 @@ pub fn build_window(
     });
 
     win
+}
+
+fn install_window_actions(
+    win: &libadwaita::ApplicationWindow,
+    windowed_width: &Rc<Cell<i32>>,
+    windowed_height: &Rc<Cell<i32>>,
+) {
+    let reset_action = gio::SimpleAction::new("reset-window-size", None);
+    {
+        let win = win.clone();
+        let windowed_width = Rc::clone(windowed_width);
+        let windowed_height = Rc::clone(windowed_height);
+        reset_action.connect_activate(move |_, _| {
+            reset_window_size(&win, &windowed_width, &windowed_height);
+        });
+    }
+    win.add_action(&reset_action);
+}
+
+fn reset_window_size(
+    win: &impl gtk4::prelude::IsA<gtk4::Window>,
+    windowed_width: &Cell<i32>,
+    windowed_height: &Cell<i32>,
+) {
+    let win = win.as_ref().clone();
+    windowed_width.set(settings::DEFAULT_WINDOW_WIDTH);
+    windowed_height.set(settings::DEFAULT_WINDOW_HEIGHT);
+    settings::reset_window_state();
+
+    apply_hidden_default_window_size(&win);
+}
+
+fn apply_hidden_default_window_size(win: &gtk4::Window) {
+    win.set_visible(false);
+    win.set_default_size(
+        settings::DEFAULT_WINDOW_WIDTH,
+        settings::DEFAULT_WINDOW_HEIGHT,
+    );
+    win.unmaximize();
+
+    let win = win.clone();
+    glib::idle_add_local_once(move || {
+        win.present();
+    });
+}
+
+fn install_window_state_tracking(
+    win: &libadwaita::ApplicationWindow,
+    windowed_width: &Rc<Cell<i32>>,
+    windowed_height: &Rc<Cell<i32>>,
+) {
+    {
+        let windowed_width = Rc::clone(windowed_width);
+        let windowed_height = Rc::clone(windowed_height);
+        win.connect_default_width_notify(move |w| {
+            if !w.is_maximized() {
+                remember_current_windowed_size(w, &windowed_width, &windowed_height);
+            }
+        });
+    }
+    {
+        let windowed_width = Rc::clone(windowed_width);
+        let windowed_height = Rc::clone(windowed_height);
+        win.connect_default_height_notify(move |w| {
+            if !w.is_maximized() {
+                remember_current_windowed_size(w, &windowed_width, &windowed_height);
+            }
+        });
+    }
+    {
+        let windowed_width = Rc::clone(windowed_width);
+        let windowed_height = Rc::clone(windowed_height);
+        win.connect_maximized_notify(move |w| {
+            persist_window_state(w, &windowed_width, &windowed_height);
+        });
+    }
+}
+
+fn remember_current_windowed_size(
+    win: &impl gtk4::prelude::IsA<gtk4::Window>,
+    windowed_width: &Cell<i32>,
+    windowed_height: &Cell<i32>,
+) {
+    let (width, height) = current_windowed_size(win, windowed_width.get(), windowed_height.get());
+    windowed_width.set(width);
+    windowed_height.set(height);
+}
+
+fn persist_window_state(
+    win: &impl gtk4::prelude::IsA<gtk4::Window>,
+    windowed_width: &Cell<i32>,
+    windowed_height: &Cell<i32>,
+) {
+    if !win.is_maximized() {
+        remember_current_windowed_size(win, windowed_width, windowed_height);
+    }
+
+    settings::save_window_state(
+        windowed_width.get(),
+        windowed_height.get(),
+        win.is_maximized(),
+    );
+}
+
+fn current_windowed_size(
+    win: &impl gtk4::prelude::IsA<gtk4::Window>,
+    fallback_width: i32,
+    fallback_height: i32,
+) -> (i32, i32) {
+    let win = win.as_ref();
+    let (default_width, default_height) = win.default_size();
+    let width = valid_window_size(default_width)
+        .or_else(|| valid_window_size(win.width()))
+        .unwrap_or(fallback_width);
+    let height = valid_window_size(default_height)
+        .or_else(|| valid_window_size(win.height()))
+        .unwrap_or(fallback_height);
+
+    (width, height)
+}
+
+fn valid_window_size(value: i32) -> Option<i32> {
+    (value > 0).then_some(value)
 }
 pub fn apply_custom_css() {
     let Some(display) = gdk::Display::default() else {
