@@ -18,6 +18,7 @@ pkgbase = gnome-quick-share
 	depends = glib2
 	depends = dbus
 	options = !debug
+	options = !lto
 	source = gnome-quick-share::git+https://github.com/weversonl/gnome-quick-share.git
 	sha256sums = SKIP
 

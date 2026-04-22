@@ -134,9 +134,13 @@ fn build_window_group(
     ));
     remember_size.set_active(settings::get_remember_window_size());
     set_pointer_cursor(&remember_size);
-    gsettings
-        .bind("remember-window-size", &remember_size, "active")
-        .build();
+    if settings::has_key("remember-window-size") {
+        gsettings
+            .bind("remember-window-size", &remember_size, "active")
+            .build();
+    } else {
+        remember_size.set_sensitive(false);
+    }
     group.add(&remember_size);
 
     let reset_row = libadwaita::ActionRow::new();

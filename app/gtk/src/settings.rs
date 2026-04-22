@@ -29,6 +29,12 @@ pub fn settings() -> gio::Settings {
     })
 }
 
+pub fn has_key(key: &str) -> bool {
+    settings()
+        .settings_schema()
+        .is_some_and(|schema| schema.has_key(key))
+}
+
 pub fn get_autostart() -> bool {
     settings().boolean("autostart")
 }
@@ -42,7 +48,11 @@ pub fn get_start_minimized() -> bool {
 }
 
 pub fn get_remember_window_size() -> bool {
-    settings().boolean("remember-window-size")
+    if has_key("remember-window-size") {
+        settings().boolean("remember-window-size")
+    } else {
+        true
+    }
 }
 
 pub fn get_visibility_raw() -> i32 {
@@ -140,6 +150,10 @@ pub fn save_window_state(width: i32, height: i32, maximized: bool) {
 }
 
 pub fn save_window_state_unchecked(width: i32, height: i32, maximized: bool) {
+    if !(has_key("window-width") && has_key("window-height") && has_key("window-maximized")) {
+        return;
+    }
+
     let s = settings();
     let _ = s.set_int("window-width", width);
     let _ = s.set_int("window-height", height);
@@ -148,6 +162,10 @@ pub fn save_window_state_unchecked(width: i32, height: i32, maximized: bool) {
 
 pub fn window_state() -> (i32, i32, bool) {
     if !get_remember_window_size() {
+        return (DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, false);
+    }
+
+    if !(has_key("window-width") && has_key("window-height") && has_key("window-maximized")) {
         return (DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, false);
     }
 
