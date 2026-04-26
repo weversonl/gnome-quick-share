@@ -1,5 +1,7 @@
 # GnomeQS
 
+**https://weversonl.github.io/gnome-quick-share/**
+
 GnomeQS is a GNOME-first Quick Share client for Linux.
 
 It is a Rust-based port built specifically with GNOME in mind, using GTK4 and libadwaita for the main application and a separate tray helper for Linux environments that still rely on AppIndicator-style integration.

@@ -1,4 +1,3 @@
-/* ===== i18n ===== */
 const translations = {
   en: {
     hero_badge: 'Open Source · AGPL-3.0',
@@ -20,8 +19,6 @@ const translations = {
     feat4_title: 'Multiple Packages',
     feat4_desc: 'Available as Flatpak, AUR, Debian, RPM, and AppImage packages.',
     install_title: 'Installation',
-    btn_download: 'Download',
-    btn_releases: 'All releases',
     install_releases: 'See all releases on GitHub →',
     stable_url_label: 'Stable URL (always latest):',
     footer_github: 'GitHub',
@@ -33,7 +30,7 @@ const translations = {
     hero_title_2: 'do jeito GNOME.',
     hero_sub: 'Transfira arquivos e texto para dispositivos próximos sem fio. Interface GTK4 nativa, sem dependência de nuvem.',
     btn_download: 'Download',
-    btn_releases: 'All releases',
+    btn_releases: 'Todos os lançamentos',
     screenshots_title: 'Veja em ação',
     ss1_title: 'GnomeQS',
     ss2_title: 'Enviar arquivos',
@@ -47,8 +44,6 @@ const translations = {
     feat4_title: 'Múltiplos Pacotes',
     feat4_desc: 'Disponível como Flatpak, AUR, Debian, RPM e AppImage.',
     install_title: 'Instalação',
-    btn_download: 'Download',
-    btn_releases: 'Todos os lançamentos',
     install_releases: 'Ver todos os lançamentos no GitHub →',
     stable_url_label: 'URL estável (sempre a mais recente):',
     footer_github: 'GitHub',
@@ -61,8 +56,12 @@ let currentLang = 'en';
 function detectLang() {
   const saved = localStorage.getItem('lang');
   if (saved && translations[saved]) return saved;
-  const nav = (navigator.language || navigator.userLanguage || '').toLowerCase();
-  return nav.startsWith('pt') ? 'pt' : 'en';
+  try {
+    const nav = (navigator.language || '').toLowerCase();
+    return nav.startsWith('pt') ? 'pt' : 'en';
+  } catch (_) {
+    return 'en';
+  }
 }
 
 function setLanguage(lang) {
@@ -79,7 +78,6 @@ function setLanguage(lang) {
   });
 }
 
-/* ===== Theme ===== */
 function detectTheme() {
   const saved = localStorage.getItem('theme');
   if (saved) return saved;
@@ -98,13 +96,11 @@ function toggleTheme() {
   setTheme(current === 'dark' ? 'light' : 'dark');
 }
 
-/* ===== Header scroll ===== */
 const header = document.getElementById('header');
 window.addEventListener('scroll', () => {
   header.classList.toggle('scrolled', window.scrollY > 20);
 }, { passive: true });
 
-/* ===== Scroll animations ===== */
 const observer = new IntersectionObserver(entries => {
   entries.forEach(e => {
     if (e.isIntersecting) {
@@ -116,7 +112,6 @@ const observer = new IntersectionObserver(entries => {
 
 document.querySelectorAll('.animate').forEach(el => observer.observe(el));
 
-/* ===== Tabs ===== */
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const tab = btn.dataset.tab;
@@ -127,7 +122,6 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   });
 });
 
-/* ===== Copy to clipboard ===== */
 document.querySelectorAll('.copy-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const code = btn.closest('.code-block').querySelector('code').textContent.trim();
@@ -138,9 +132,7 @@ document.querySelectorAll('.copy-btn').forEach(btn => {
   });
 });
 
-/* ===== GitHub Release (dynamic version + URLs) ===== */
 const REPO = 'weversonl/gnome-quick-share';
-const FALLBACK_VERSION = 'v1.4.0';
 
 async function fetchLatestRelease() {
   try {
@@ -150,12 +142,9 @@ async function fetchLatestRelease() {
     document.querySelectorAll('#hero-version, #footer-version').forEach(el => {
       el.textContent = data.tag_name;
     });
-  } catch (_) {
-    // silently keep fallback hardcoded values
-  }
+  } catch (_) {}
 }
 
-/* ===== Init ===== */
 setTheme(detectTheme());
 setLanguage(detectLang());
 fetchLatestRelease();
