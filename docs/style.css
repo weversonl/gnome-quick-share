@@ -562,6 +562,575 @@ body {
 }
 
 @media (max-width: 480px) {
-  .screenshots-grid { grid-template-columns: 1fr; }
   .features-grid { grid-template-columns: 1fr; }
+}
+
+/* ── LIVE DEMO ──────────────────────────────────────────────── */
+.demo-subtitle {
+  text-align: center;
+  color: var(--text-3);
+  font-size: 0.9rem;
+  margin-top: -0.5rem;
+  margin-bottom: 2rem;
+}
+
+.demo-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+/* ── GNOME Window ── */
+.gnome-window {
+  width: 100%;
+  max-width: 360px;
+  background: #11101e;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 32px 96px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.07);
+  display: flex;
+  flex-direction: column;
+}
+
+.gnome-headerbar {
+  background: #0e0d1c;
+  padding: 0.55rem 0.9rem;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.gnome-wm-buttons { display: flex; gap: 6px; z-index: 1; }
+
+.wm-btn {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: none;
+  cursor: default;
+  flex-shrink: 0;
+}
+
+.wm-close { background: #ff5f57; }
+.wm-min   { background: #ffbd2e; }
+.wm-max   { background: #28c840; }
+
+.gnome-title {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgba(232, 228, 255, 0.85);
+  white-space: nowrap;
+}
+
+.gnome-settings-btn {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: rgba(232, 228, 255, 0.45);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+  transition: color 0.2s, background 0.2s;
+  z-index: 1;
+}
+
+.gnome-settings-btn:hover { color: rgba(232,228,255,0.85); background: rgba(255,255,255,0.07); }
+
+/* Section label (Active transfers) */
+.app-section-label {
+  padding: 0.55rem 1rem 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(232, 228, 255, 0.45);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.app-section-label.hidden { display: none; }
+
+/* Content area */
+.gnome-content {
+  flex: 1;
+  padding: 0 1rem 1rem;
+  min-height: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Demo states */
+.demo-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  animation: stateIn 0.35s ease forwards;
+}
+
+.demo-state.hidden { display: none; }
+
+@keyframes stateIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Orbit animation (idle) ── */
+.orbit-scene {
+  position: relative;
+  width: 90px;
+  height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+}
+
+.orbit-center-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #c4b5fd, #7c6ff0);
+  box-shadow: 0 0 18px rgba(139,124,248,0.7), 0 0 40px rgba(139,124,248,0.25);
+  position: relative;
+  z-index: 2;
+  transition: background 0.6s, box-shadow 0.6s;
+}
+
+.orbit-center-done {
+  background: radial-gradient(circle at 35% 30%, #a8f0c0, #3ecf6e) !important;
+  box-shadow: 0 0 18px rgba(62,207,110,0.7), 0 0 40px rgba(62,207,110,0.25) !important;
+}
+
+.orbit-arm {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  transform-origin: 0 0;
+}
+
+.orbit-arm-1 { animation: orbitSpin 3.2s linear infinite; }
+.orbit-arm-2 { animation: orbitSpin 5s linear infinite reverse; }
+.orbit-arm-3 { animation: orbitSpin 7s linear infinite; }
+
+@keyframes orbitSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.orbit-dot {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: rgba(196, 181, 253, 0.85);
+  box-shadow: 0 0 6px rgba(196,181,253,0.6);
+}
+
+.orbit-dot-sm {
+  width: 6px;
+  height: 6px;
+  background: rgba(196,181,253,0.55);
+}
+
+.orbit-arm-1 .orbit-dot { top: -4.5px; left: 30px; }
+.orbit-arm-2 .orbit-dot { top: -4.5px; left: 22px; }
+.orbit-arm-3 .orbit-dot { top: -3px;   left: 36px; }
+
+/* Ready to receive text */
+.app-ready-text {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: rgba(232,228,255,0.9);
+  text-align: center;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
+.app-ready-accent {
+  background: linear-gradient(135deg, #8b7cf8, #c4b5fd);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.app-visible-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(139,124,248,0.12);
+  border: 1px solid rgba(139,124,248,0.22);
+  border-radius: 99px;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.78rem;
+  color: rgba(196,181,253,0.85);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.app-visible-badge:hover {
+  background: rgba(139,124,248,0.2);
+}
+
+.app-visible-badge.hidden-state {
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.1);
+  color: rgba(232,228,255,0.35);
+}
+
+.app-visible-done {
+  background: rgba(62,207,110,0.1);
+  border-color: rgba(62,207,110,0.25);
+  color: rgba(100,220,140,0.9);
+}
+
+/* ── Transfer card (incoming / receiving) ── */
+.transfer-card {
+  width: 100%;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 0.85rem 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.tc-left {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.tc-device-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: rgba(139,124,248,0.15);
+  border: 1px solid rgba(139,124,248,0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #c4b5fd;
+  flex-shrink: 0;
+}
+
+.tc-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.tc-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: rgba(232,228,255,0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tc-wants {
+  font-size: 0.75rem;
+  color: rgba(232,228,255,0.45);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Row with pin + accept (incoming) */
+.tc-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  margin-top: 0.1rem;
+}
+
+/* PIN badge */
+.pin-badge {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 6px;
+  padding: 0.25rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: rgba(232,228,255,0.6);
+  letter-spacing: 0.05em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* GNOME button */
+.gnome-btn {
+  padding: 0.42rem 1rem;
+  border-radius: 8px;
+  border: none;
+  font-size: 0.83rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s, transform 0.12s;
+  font-family: inherit;
+}
+
+.gnome-btn:hover  { filter: brightness(1.15); transform: translateY(-1px); }
+.gnome-btn:active { filter: brightness(0.88); transform: translateY(0); }
+
+.btn-suggested  { background: #7c6ff0; color: #fff; }
+.btn-ghost-outline {
+  background: rgba(255,255,255,0.05);
+  color: rgba(232,228,255,0.75);
+  border: 1px solid rgba(255,255,255,0.1);
+  flex: 1;
+}
+
+/* Incoming card: left info + right col (pin + accept + decline) */
+.tc-incoming {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.tc-actions-col {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
+  flex-shrink: 0;
+  min-width: 90px;
+}
+
+.tc-btn-full { width: 100%; text-align: center; }
+
+.btn-decline-red {
+  background: rgba(220, 80, 80, 0.18);
+  color: rgba(255, 140, 140, 0.9);
+  border: 1px solid rgba(220, 80, 80, 0.25);
+}
+
+.btn-decline-red:hover { background: rgba(220,80,80,0.28); }
+
+.tc-saved { color: rgba(100,220,140,0.75) !important; }
+
+/* Progress bar */
+.transfer-progress-wrap {
+  width: 100%;
+  height: 5px;
+  background: rgba(255,255,255,0.07);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.transfer-progress-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #7c6ff0, #c4b5fd);
+  border-radius: 99px;
+  transition: width 0.12s linear;
+}
+
+/* ── Bottom nav ── */
+.app-bottom-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem 1rem;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  flex-shrink: 0;
+}
+
+.app-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.65rem;
+  border-radius: 10px;
+  border: none;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.2s, color 0.2s, filter 0.15s;
+  background: rgba(255,255,255,0.05);
+  color: rgba(232,228,255,0.55);
+}
+
+.app-nav-btn:hover { background: rgba(255,255,255,0.09); color: rgba(232,228,255,0.8); }
+
+.app-nav-active {
+  background: #7c6ff0 !important;
+  color: #fff !important;
+}
+
+.app-nav-active:hover { filter: brightness(1.1); }
+
+/* ── Replay ── */
+.demo-replay {
+  display: block;
+  margin: 0 auto;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  padding: 0.45rem 1.3rem;
+  border-radius: 99px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all var(--transition);
+  font-family: inherit;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.demo-replay.visible { opacity: 1; pointer-events: auto; }
+
+.demo-replay:hover {
+  background: var(--surface-2);
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+@media (max-width: 480px) {
+  .gnome-window { max-width: 100%; border-radius: 12px; }
+}
+
+/* ── LIGHT THEME overrides ── */
+[data-theme="light"] .gnome-window {
+  background: #f0eeff;
+  box-shadow: 0 24px 64px rgba(108,92,231,0.12), 0 0 0 1px rgba(108,92,231,0.1);
+}
+
+[data-theme="light"] .gnome-headerbar {
+  background: #ffffff;
+  border-bottom-color: rgba(108,92,231,0.1);
+}
+
+[data-theme="light"] .gnome-title {
+  color: #1a1240;
+}
+
+[data-theme="light"] .gnome-settings-btn {
+  color: rgba(26,18,64,0.4);
+}
+
+[data-theme="light"] .gnome-settings-btn:hover {
+  color: #1a1240;
+  background: rgba(108,92,231,0.08);
+}
+
+[data-theme="light"] .app-section-label {
+  color: rgba(26,18,64,0.45);
+}
+
+[data-theme="light"] .gnome-content {
+  /* inherits light bg from window */
+}
+
+[data-theme="light"] .orbit-center-dot {
+  background: radial-gradient(circle at 35% 30%, #c4b5fd, #7c6ff0);
+  box-shadow: 0 0 18px rgba(124,111,240,0.35), 0 0 40px rgba(124,111,240,0.12);
+}
+
+[data-theme="light"] .orbit-dot {
+  background: rgba(108,92,231,0.55);
+  box-shadow: none;
+}
+
+[data-theme="light"] .app-ready-text {
+  color: #1a1240;
+}
+
+[data-theme="light"] .app-visible-badge {
+  background: rgba(108,92,231,0.08);
+  border-color: rgba(108,92,231,0.18);
+  color: #5a9e8f;
+}
+
+[data-theme="light"] .app-visible-badge.hidden-state {
+  background: rgba(0,0,0,0.04);
+  border-color: rgba(0,0,0,0.1);
+  color: rgba(26,18,64,0.3);
+}
+
+[data-theme="light"] .transfer-card {
+  background: #ffffff;
+  border-color: rgba(108,92,231,0.12);
+  box-shadow: 0 2px 12px rgba(108,92,231,0.06);
+}
+
+[data-theme="light"] .tc-device-icon {
+  background: rgba(108,92,231,0.08);
+  border-color: rgba(108,92,231,0.15);
+  color: #7c6ff0;
+}
+
+[data-theme="light"] .tc-name {
+  color: #1a1240;
+}
+
+[data-theme="light"] .tc-wants {
+  color: rgba(26,18,64,0.5);
+}
+
+[data-theme="light"] .tc-saved {
+  color: #3a9e78 !important;
+}
+
+[data-theme="light"] .pin-badge {
+  background: rgba(0,0,0,0.05);
+  border-color: rgba(0,0,0,0.1);
+  color: rgba(26,18,64,0.55);
+}
+
+[data-theme="light"] .btn-ghost-outline {
+  background: rgba(0,0,0,0.04);
+  color: rgba(26,18,64,0.7);
+  border-color: rgba(0,0,0,0.1);
+}
+
+[data-theme="light"] .btn-ghost-outline:hover {
+  background: rgba(0,0,0,0.08);
+}
+
+[data-theme="light"] .btn-decline-red {
+  background: rgba(200,60,60,0.08);
+  color: #c04040;
+  border-color: rgba(200,60,60,0.18);
+}
+
+[data-theme="light"] .transfer-progress-wrap {
+  background: rgba(0,0,0,0.07);
+}
+
+[data-theme="light"] .app-bottom-nav {
+  border-top-color: rgba(108,92,231,0.1);
+}
+
+[data-theme="light"] .app-nav-btn {
+  background: rgba(0,0,0,0.04);
+  color: rgba(26,18,64,0.5);
+}
+
+[data-theme="light"] .app-nav-btn:hover {
+  background: rgba(0,0,0,0.08);
+  color: #1a1240;
+}
+
+[data-theme="light"] .app-nav-active {
+  background: #7c6ff0 !important;
+  color: #fff !important;
 }

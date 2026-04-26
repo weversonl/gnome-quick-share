@@ -7,8 +7,22 @@ const translations = {
     btn_download: 'Download',
     btn_releases: 'All releases',
     screenshots_title: 'See it in action',
-    ss1_title: 'GnomeQS',
-    ss2_title: 'Send files',
+    demo_subtitle: 'Interactive demo — simulates a real file transfer',
+    demo_active_transfers: 'Active transfers',
+    demo_ready_to: 'Ready to',
+    demo_receive: 'receive',
+    demo_visible: 'Visible',
+    demo_hidden: 'Hidden',
+    demo_wants: 'Wants to share 1 file · 430.2 KB',
+    demo_accept: 'Accept',
+    demo_decline: 'Decline',
+    demo_saved_path: 'Saved to ~/Downloads/Quickshare',
+    demo_btn_open: 'Open',
+    demo_btn_folder: 'Show folder',
+    demo_btn_clear: 'Clear',
+    demo_send: 'Send',
+    demo_receive_btn: 'Receive',
+    demo_replay: '↺ Replay demo',
     features_title: 'Why GnomeQS?',
     feat1_title: 'mDNS Discovery',
     feat1_desc: 'Automatically finds nearby devices on your network. No pairing, no accounts.',
@@ -32,8 +46,22 @@ const translations = {
     btn_download: 'Download',
     btn_releases: 'Todos os lançamentos',
     screenshots_title: 'Veja em ação',
-    ss1_title: 'GnomeQS',
-    ss2_title: 'Enviar arquivos',
+    demo_subtitle: 'Demo interativo — simula uma transferência real',
+    demo_active_transfers: 'Transferências ativas',
+    demo_ready_to: 'Pronto para',
+    demo_receive: 'receber',
+    demo_visible: 'Visível',
+    demo_hidden: 'Oculto',
+    demo_wants: 'Quer compartilhar 1 arquivo · 430.2 KB',
+    demo_accept: 'Aceitar',
+    demo_decline: 'Recusar',
+    demo_saved_path: 'Salvo em ~/Downloads/Quickshare',
+    demo_btn_open: 'Abrir',
+    demo_btn_folder: 'Mostrar pasta',
+    demo_btn_clear: 'Limpar',
+    demo_send: 'Enviar',
+    demo_receive_btn: 'Receber',
+    demo_replay: '↺ Repetir demo',
     features_title: 'Por que GnomeQS?',
     feat1_title: 'Descoberta mDNS',
     feat1_desc: 'Encontra automaticamente dispositivos próximos na sua rede. Sem pareamento, sem contas.',
@@ -153,3 +181,113 @@ document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
 document.getElementById('lang-toggle').addEventListener('click', () => {
   setLanguage(currentLang === 'en' ? 'pt' : 'en');
 });
+
+// ── LIVE DEMO ────────────────────────────────────────
+function initDemo() {
+  const stateEls = {
+    idle:      document.getElementById('state-idle'),
+    incoming:  document.getElementById('state-incoming'),
+    receiving: document.getElementById('state-receiving'),
+    complete:  document.getElementById('state-complete'),
+  };
+  const sectionLabel = document.getElementById('app-section-label');
+  const progressBar  = document.getElementById('demo-progress');
+  const statsEl      = document.getElementById('demo-stats');
+  const replayBtn    = document.getElementById('demo-replay');
+  const acceptBtn    = document.getElementById('btn-accept');
+
+  let animating        = false;
+  let progressInterval = null;
+  let autoAcceptTimer  = null;
+
+  function showState(name) {
+    Object.values(stateEls).forEach(s => s.classList.add('hidden'));
+    stateEls[name].classList.remove('hidden');
+    const showLabel = name === 'incoming' || name === 'receiving' || name === 'complete';
+    sectionLabel.classList.toggle('hidden', !showLabel);
+  }
+
+  function startTransfer() {
+    clearTimeout(autoAcceptTimer);
+    showState('receiving');
+    progressBar.style.width = '0%';
+
+    let pct = 0;
+    progressInterval = setInterval(() => {
+      pct += Math.random() * 5 + 2;
+      if (pct >= 100) {
+        pct = 100;
+        clearInterval(progressInterval);
+        progressBar.style.width = '100%';
+        if (statsEl) statsEl.textContent = '100%';
+        setTimeout(() => {
+          showState('complete');
+          replayBtn.classList.add('visible');
+          animating = false;
+        }, 500);
+        return;
+      }
+      progressBar.style.width = pct.toFixed(0) + '%';
+      if (statsEl) statsEl.textContent = Math.floor(pct) + '%';
+    }, 90);
+  }
+
+  function runDemo() {
+    if (animating) return;
+    animating = true;
+    if (progressInterval) clearInterval(progressInterval);
+    clearTimeout(autoAcceptTimer);
+    replayBtn.classList.remove('visible');
+
+    showState('idle');
+
+    setTimeout(() => {
+      showState('incoming');
+      autoAcceptTimer = setTimeout(startTransfer, 3200);
+    }, 1800);
+  }
+
+  // Visibility toggle
+  const visBtn   = document.getElementById('demo-visibility-btn');
+  const visLabel = document.getElementById('demo-visibility-label');
+  const visIcon  = document.getElementById('demo-visibility-icon');
+  const eyeOpen  = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+  const eyeClosed= '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>';
+  let visible = true;
+
+  visBtn.addEventListener('click', () => {
+    visible = !visible;
+    visBtn.classList.toggle('hidden-state', !visible);
+    visIcon.innerHTML = visible ? eyeOpen : eyeClosed;
+    visLabel.dataset.i18n = visible ? 'demo_visible' : 'demo_hidden';
+    visLabel.textContent = translations[currentLang][visLabel.dataset.i18n];
+  });
+
+  acceptBtn.addEventListener('click', startTransfer);
+
+  document.getElementById('btn-decline').addEventListener('click', () => {
+    clearTimeout(autoAcceptTimer);
+    showState('idle');
+    animating = false;
+    setTimeout(runDemo, 1200);
+  });
+
+  replayBtn.addEventListener('click', runDemo);
+
+  document.getElementById('btn-clear').addEventListener('click', () => {
+    replayBtn.classList.remove('visible');
+    showState('idle');
+    animating = false;
+    setTimeout(runDemo, 800);
+  });
+
+  const section = document.getElementById('screenshots');
+  if (section) {
+    const obs = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting) { runDemo(); obs.disconnect(); }
+    }, { threshold: 0.2 });
+    obs.observe(section);
+  }
+}
+
+initDemo();
