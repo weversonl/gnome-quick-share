@@ -22,7 +22,15 @@ const translations = {
     demo_btn_clear: 'Clear',
     demo_send: 'Send',
     demo_receive_btn: 'Receive',
-    demo_replay: '↺ Replay demo',
+    demo_replay: '↺ Replay',
+    demo_label_receive: 'Receiving',
+    demo_label_send: 'Sending',
+    demo_send_files: 'Send Files',
+    demo_add_files: 'Add Files',
+    demo_drop_hint: 'Drop files here or use Select',
+    demo_nearby: 'Nearby devices',
+    demo_selected_files: 'Selected Files',
+    demo_sent_ok: 'IMG_20260425.jpg sent',
     features_title: 'Why GnomeQS?',
     feat1_title: 'mDNS Discovery',
     feat1_desc: 'Automatically finds nearby devices on your network. No pairing, no accounts.',
@@ -61,7 +69,15 @@ const translations = {
     demo_btn_clear: 'Limpar',
     demo_send: 'Enviar',
     demo_receive_btn: 'Receber',
-    demo_replay: '↺ Repetir demo',
+    demo_replay: '↺ Repetir',
+    demo_label_receive: 'Recebendo',
+    demo_label_send: 'Enviando',
+    demo_send_files: 'Enviar Arquivos',
+    demo_add_files: 'Adicionar Arquivos',
+    demo_drop_hint: 'Solte arquivos aqui ou use Selecionar',
+    demo_nearby: 'Dispositivos próximos',
+    demo_selected_files: 'Arquivos selecionados',
+    demo_sent_ok: 'IMG_20260425.jpg enviado',
     features_title: 'Por que GnomeQS?',
     feat1_title: 'Descoberta mDNS',
     feat1_desc: 'Encontra automaticamente dispositivos próximos na sua rede. Sem pareamento, sem contas.',
@@ -291,3 +307,99 @@ function initDemo() {
 }
 
 initDemo();
+
+// ── SEND DEMO ────────────────────────────────────────
+function initSendDemo() {
+  const sendStates = {
+    idle:    document.getElementById('send-state-idle'),
+    file:    document.getElementById('send-state-file'),
+    sending: document.getElementById('send-state-sending'),
+    done:    document.getElementById('send-state-done'),
+  };
+  const sendProgress = document.getElementById('send-progress');
+  const sendStats    = document.getElementById('send-stats');
+  const sendReplay   = document.getElementById('send-replay');
+  const btnAddFiles  = document.getElementById('btn-add-files');
+  const btnDeviceS26 = document.getElementById('send-device-s26');
+  const btnSendClear = document.getElementById('send-btn-clear');
+
+  let animating        = false;
+  let progressInterval = null;
+  let autoTimers       = [];
+
+  function clearTimers() { autoTimers.forEach(clearTimeout); autoTimers = []; }
+
+  function showSendState(name) {
+    Object.values(sendStates).forEach(s => s.classList.add('hidden'));
+    sendStates[name].classList.remove('hidden');
+  }
+
+  function startSending() {
+    clearTimers();
+    showSendState('sending');
+    sendProgress.style.width = '0%';
+    let pct = 0;
+    progressInterval = setInterval(() => {
+      pct += Math.random() * 5 + 2;
+      if (pct >= 100) {
+        pct = 100;
+        clearInterval(progressInterval);
+        sendProgress.style.width = '100%';
+        if (sendStats) sendStats.textContent = '100%';
+        autoTimers.push(setTimeout(() => {
+          showSendState('done');
+          sendReplay.classList.add('visible');
+          animating = false;
+        }, 500));
+        return;
+      }
+      sendProgress.style.width = pct.toFixed(0) + '%';
+      if (sendStats) sendStats.textContent = Math.floor(pct) + '%';
+    }, 90);
+  }
+
+  function runSendDemo() {
+    if (animating) return;
+    animating = true;
+    clearTimers();
+    if (progressInterval) clearInterval(progressInterval);
+    sendReplay.classList.remove('visible');
+
+    showSendState('idle');
+
+    // auto: add file after 2s
+    autoTimers.push(setTimeout(() => {
+      showSendState('file');
+      // auto: click device after 2.5s
+      autoTimers.push(setTimeout(startSending, 2500));
+    }, 2000));
+  }
+
+  btnAddFiles.addEventListener('click', () => {
+    clearTimers();
+    showSendState('file');
+    autoTimers.push(setTimeout(startSending, 2500));
+  });
+
+  btnDeviceS26.addEventListener('click', startSending);
+
+  btnSendClear.addEventListener('click', () => {
+    sendReplay.classList.remove('visible');
+    showSendState('idle');
+    animating = false;
+    autoTimers.push(setTimeout(runSendDemo, 800));
+  });
+
+  sendReplay.addEventListener('click', runSendDemo);
+
+  // Start when receive demo starts (same viewport trigger)
+  const section = document.getElementById('screenshots');
+  if (section) {
+    const obs = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting) { runSendDemo(); obs.disconnect(); }
+    }, { threshold: 0.2 });
+    obs.observe(section);
+  }
+}
+
+initSendDemo();
