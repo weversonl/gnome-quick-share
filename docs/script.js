@@ -1,6 +1,6 @@
 const translations = {
   en: {
-    hero_badge: 'Open Source · AGPL-3.0',
+    hero_badge: 'Open Source · GPL-3.0',
     hero_title_1: 'Share files on Linux,',
     hero_title_2: 'the GNOME way.',
     hero_sub: 'Transfer files and text to nearby devices wirelessly. Native GTK4 interface, zero cloud dependency.',
@@ -25,7 +25,7 @@ const translations = {
     footer_issues: 'Issues',
   },
   pt: {
-    hero_badge: 'Código Aberto · AGPL-3.0',
+    hero_badge: 'Código Aberto · GPL-3.0',
     hero_title_1: 'Compartilhe arquivos no Linux,',
     hero_title_2: 'do jeito GNOME.',
     hero_sub: 'Transfira arquivos e texto para dispositivos próximos sem fio. Interface GTK4 nativa, sem dependência de nuvem.',
