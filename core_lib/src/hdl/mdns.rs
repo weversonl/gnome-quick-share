@@ -94,7 +94,7 @@ impl MDnsServer {
                 _ = self.visibility_receiver.changed() => {
                     visibility = *self.visibility_receiver.borrow_and_update();
 
-                    debug!("{INNER_NAME}: visibility changed: {visibility:?}");
+                    info!("{INNER_NAME}: visibility changed: {visibility:?}");
                     if visibility == Visibility::Visible {
                         if !registered {
                             self.daemon.register(self.service_info.clone())?;
@@ -145,13 +145,38 @@ impl MDnsServer {
                         continue;
                     }
 
-                    // Re-announce without sending a goodbye first. mdns-sd supports calling
-                    // register() again on an already-registered service to re-broadcast it.
-                    // Staying registered means Samsung's browse query always gets a response,
-                    // even if it fires immediately after the transfer.
-                    debug!("{INNER_NAME}: post-transfer reset: re-announcing service");
+                    // One clean goodbye + fresh register (same as toggling visibility).
+                    // Then spawn a background task that re-announces every 3 s for 15 s
+                    // so Android's browse window catches it whenever it opens.
+                    info!("{INNER_NAME}: post-transfer reset: unregister");
+                    if registered {
+                        let rx = self.daemon.unregister(self.service_info.get_fullname())?;
+                        let _ = rx.recv();
+                        registered = false;
+                    }
+                    // Wait for Android to process the goodbye before re-announcing.
+                    // Without this delay, Android ignores the new announcement (same
+                    // symptom as the original goodbye+sleep bug, but on the Android side).
+                    tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+                    if *self.visibility_receiver.borrow() == Visibility::Invisible {
+                        continue;
+                    }
                     self.daemon.register(self.service_info.clone())?;
                     registered = true;
+                    info!("{INNER_NAME}: post-transfer reset: re-registered");
+
+                    let daemon = self.daemon.clone();
+                    let fullname = self.service_info.get_fullname().to_owned();
+                    let vis_rx = self.visibility_receiver.clone();
+                    tokio::spawn(async move {
+                        for _ in 0..5u8 {
+                            tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                            if *vis_rx.borrow() == Visibility::Invisible {
+                                break;
+                            }
+                            let _ = daemon.register_resend(&fullname);
+                        }
+                    });
                 },
                 _ = temporary_visibility_interval.tick() => {
                     if visibility != Visibility::Temporarily {

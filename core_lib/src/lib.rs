@@ -32,7 +32,7 @@ mod utils;
 mod wifi_direct;
 
 pub use hdl::info::{TransferMetadata, TransferRiskLevel};
-pub use hdl::{EndpointInfo, EndpointTransport, OutboundPayload, State, Visibility};
+pub use hdl::{EndpointInfo, EndpointTransport, OutboundPayload, State, TextPayloadType, Visibility};
 pub use manager::SendInfo;
 pub use utils::{DeviceType, RemoteDeviceInfo};
 pub use wifi_direct::{

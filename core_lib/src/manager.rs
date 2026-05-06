@@ -69,10 +69,12 @@ impl TcpServer {
                     let endpoint_id = self.endpoint_id;
                     let sender = self.sender.clone();
                     let cancel_sender = self.cancel_sender.clone();
+                    let mdns_resend_sender = self.mdns_resend_sender.clone();
                     tokio::spawn(async move {
                         if let Err(e) = connect(cctk, endpoint_id, sender, cancel_sender, i).await {
                             error!("{INNER_NAME}: error sending: {}", e.to_string());
                         }
+                        schedule_mdns_resend(mdns_resend_sender).await;
                     });
                 }
                 r = self.tcp_listener.accept() => {
@@ -211,13 +213,8 @@ async fn connect(
 }
 
 async fn schedule_mdns_resend(sender: broadcast::Sender<()>) {
-    // Three staggered re-announcements so Samsung's browse window catches at least one.
-    // Each register() call also auto-schedules a second announcement at +1 s (RFC 6762 §8.3),
-    // giving ~6 multicast packets total over a 7 s window.
-    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-    let _ = sender.send(());
-    tokio::time::sleep(std::time::Duration::from_millis(2000)).await;
-    let _ = sender.send(());
-    tokio::time::sleep(std::time::Duration::from_millis(4000)).await;
+    info!("{INNER_NAME}: schedule_mdns_resend: starting");
+    tokio::time::sleep(std::time::Duration::from_millis(800)).await;
+    info!("{INNER_NAME}: schedule_mdns_resend: sending reset");
     let _ = sender.send(());
 }

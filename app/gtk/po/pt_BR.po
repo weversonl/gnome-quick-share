@@ -202,6 +202,9 @@ msgstr "Recebido"
 msgid "text"
 msgstr "texto"
 
+msgid "Text"
+msgstr "Texto"
+
 msgid "Saved to"
 msgstr "Salvo em"
 

@@ -467,7 +467,6 @@ impl TransferRow {
                 self.subtitle_label.set_text(&subtitle);
                 *self.last_subtitle.borrow_mut() = subtitle;
                 self.clear_btn.set_visible(true);
-                self.retry_btn.set_visible(meta.files.is_some());
             }
             State::Cancelled => {
                 self.row.add_css_class("transfer-error");
@@ -529,8 +528,15 @@ fn build_transfer_description(meta: &TransferMetadata) -> String {
             format_size(meta.total_bytes)
         );
         description
-    } else if meta.text_payload.is_some() {
-        format!("{} {}", tr!("Wants to share"), tr!("text"))
+    } else if meta.text_type.is_some() {
+        if let Some(text) = &meta.text_payload {
+            let preview = truncate_text_preview(text, 50);
+            format!("{} {} · \"{preview}\"", tr!("Wants to share"), tr!("text"))
+        } else if let Some(desc) = &meta.text_description {
+            format!("{} {} · \"{desc}\"", tr!("Wants to share"), tr!("text"))
+        } else {
+            format!("{} {}", tr!("Wants to share"), tr!("text"))
+        }
     } else {
         tr!("Wants to share")
     }
@@ -560,7 +566,31 @@ fn update_risk_badge(label: &gtk4::Label, meta: &TransferMetadata) {
     }
 }
 
+fn truncate_text_preview(text: &str, max_chars: usize) -> String {
+    let normalized: String = text
+        .chars()
+        .map(|c| if matches!(c, '\n' | '\r' | '\t') { ' ' } else { c })
+        .collect();
+    let trimmed = normalized.trim();
+    if trimmed.chars().count() <= max_chars {
+        trimmed.to_string()
+    } else {
+        let truncated: String = trimmed.chars().take(max_chars).collect();
+        format!("{truncated}…")
+    }
+}
+
 fn build_transfer_tooltip(meta: &TransferMetadata) -> Option<String> {
+    if meta.text_type.is_some() && meta.files.is_none() {
+        let content = meta
+            .text_payload
+            .as_deref()
+            .or(meta.text_description.as_deref());
+        if let Some(text) = content {
+            let preview = truncate_text_preview(text, 300);
+            return Some(format!("{}:\n{}", tr!("Text"), preview));
+        }
+    }
     let files = meta.files.as_ref()?;
     let mut lines = vec![format!("{}:", tr!("Files"))];
     lines.extend(files.iter().take(12).map(|file| format!("- {file}")));

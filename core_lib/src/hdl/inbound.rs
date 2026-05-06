@@ -965,6 +965,7 @@ impl InboundRequest {
                         files: None,
                         pin_code: self.state.pin_code.clone(),
                         text_description: meta.text_title.clone(),
+                        text_type: Some(TextPayloadType::Url),
                         ..Default::default()
                     };
 
@@ -988,6 +989,7 @@ impl InboundRequest {
                         files: None,
                         pin_code: self.state.pin_code.clone(),
                         text_description: meta.text_title.clone(),
+                        text_type: Some(TextPayloadType::Text),
                         ..Default::default()
                     };
 
@@ -1019,6 +1021,7 @@ impl InboundRequest {
                 files: None,
                 pin_code: self.state.pin_code.clone(),
                 text_description: meta.ssid.clone(),
+                text_type: Some(TextPayloadType::Wifi),
                 ..Default::default()
             };
 
