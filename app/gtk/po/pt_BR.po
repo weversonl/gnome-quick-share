@@ -205,6 +205,12 @@ msgstr "texto"
 msgid "Text"
 msgstr "Texto"
 
+msgid "Or send a text"
+msgstr "Ou envie um texto"
+
+msgid "Send text"
+msgstr "Enviar texto"
+
 msgid "Saved to"
 msgstr "Salvo em"
 

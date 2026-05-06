@@ -40,7 +40,8 @@ use crate::securemessage::{
     SecureMessage, SigScheme,
 };
 use crate::sharing_nearby::{
-    FileMetadata, IntroductionFrame, file_metadata, paired_key_result_frame,
+    FileMetadata, IntroductionFrame, TextMetadata, file_metadata, paired_key_result_frame,
+    text_metadata,
 };
 use crate::utils::{
     DeviceType, RemoteDeviceInfo, encode_point, gen_ecdsa_keypair, gen_random, hkdf_extract_expand,
@@ -58,6 +59,7 @@ const PROGRESS_UPDATE_BYTES: u64 = 2 * 1024 * 1024;
 #[derive(Debug, Deserialize, Serialize)]
 pub enum OutboundPayload {
     Files(Vec<String>),
+    Text(String),
 }
 
 #[derive(Debug)]
@@ -112,7 +114,19 @@ impl OutboundRequest {
         rdi: RemoteDeviceInfo,
     ) -> Self {
         let receiver = sender.subscribe();
-        let OutboundPayload::Files(files) = &payload;
+        let initial_meta = match &payload {
+            OutboundPayload::Files(files) => TransferMetadata {
+                id: String::from(""),
+                source: Some(rdi),
+                files: Some(files.clone()),
+                ..Default::default()
+            },
+            OutboundPayload::Text(_) => TransferMetadata {
+                id: String::from(""),
+                source: Some(rdi),
+                ..Default::default()
+            },
+        };
 
         Self {
             endpoint_id,
@@ -123,12 +137,7 @@ impl OutboundRequest {
                 client_seq: 0,
                 state: State::Initial,
                 encryption_done: true,
-                transfer_metadata: Some(TransferMetadata {
-                    id: String::from(""),
-                    source: Some(rdi),
-                    files: Some(files.to_owned()),
-                    ..Default::default()
-                }),
+                transfer_metadata: Some(initial_meta),
                 ..Default::default()
             },
             sender,
@@ -687,6 +696,7 @@ impl OutboundRequest {
         }
 
         let mut file_metadata: Vec<FileMetadata> = vec![];
+        let mut text_metadata: Vec<TextMetadata> = vec![];
         let mut transferred_files: HashMap<i64, InternalFileInfo> = HashMap::new();
         let mut total_to_send = 0;
         match &self.payload {
@@ -755,6 +765,20 @@ impl OutboundRequest {
                     total_to_send += fmetadata.size();
                 }
             }
+            OutboundPayload::Text(text) => {
+                let bytes = text.as_bytes();
+                let payload_id = rand::rng().random::<i64>().abs();
+                let tmeta = TextMetadata {
+                    payload_id: Some(payload_id),
+                    r#type: Some(text_metadata::Type::Text.into()),
+                    size: Some(bytes.len() as i64),
+                    ..Default::default()
+                };
+                text_metadata.push(tmeta);
+                total_to_send = bytes.len() as u64;
+                self.state.text_payload_id = Some(payload_id);
+                info!("Text payload to send: {} bytes, payload_id={}", bytes.len(), payload_id);
+            }
         }
 
         self.update_state(
@@ -774,6 +798,7 @@ impl OutboundRequest {
                 r#type: Some(sharing_nearby::v1_frame::FrameType::Introduction.into()),
                 introduction: Some(IntroductionFrame {
                     file_metadata,
+                    text_metadata,
                     ..Default::default()
                 }),
                 ..Default::default()
@@ -805,6 +830,21 @@ impl OutboundRequest {
                     true,
                 )
                 .await;
+
+                if let OutboundPayload::Text(text) = &self.payload {
+                    let text = text.clone();
+                    info!("Sending text payload: {} bytes", text.len());
+                    self.send_text_payload(&text).await?;
+                    self.update_state(
+                        |e| {
+                            e.state = State::Finished;
+                        },
+                        true,
+                    )
+                    .await;
+                    self.disconnection().await?;
+                    return Err(anyhow!(crate::errors::AppError::NotAnError));
+                }
 
                 let ids: Vec<i64> = self.state.transferred_files.keys().cloned().collect();
                 info!("We are sending: {:?}", ids);
@@ -1011,6 +1051,63 @@ impl OutboundRequest {
                 return Err(anyhow!(crate::errors::AppError::NotAnError));
             }
         }
+
+        Ok(())
+    }
+
+    async fn send_text_payload(&mut self, text: &str) -> Result<(), anyhow::Error> {
+        let pid = self
+            .state
+            .text_payload_id
+            .ok_or_else(|| anyhow!("text_payload_id not set before send_text_payload"))?;
+        let body = text.as_bytes().to_vec();
+        let total = body.len() as i64;
+
+        let header = PayloadHeader {
+            id: Some(pid),
+            r#type: Some(payload_header::PayloadType::Bytes.into()),
+            total_size: Some(total),
+            is_sensitive: Some(false),
+            ..Default::default()
+        };
+
+        let data_frame = location_nearby_connections::OfflineFrame {
+            version: Some(location_nearby_connections::offline_frame::Version::V1.into()),
+            v1: Some(location_nearby_connections::V1Frame {
+                r#type: Some(location_nearby_connections::v1_frame::FrameType::PayloadTransfer.into()),
+                payload_transfer: Some(PayloadTransferFrame {
+                    packet_type: Some(PacketType::Data.into()),
+                    payload_chunk: Some(PayloadChunk {
+                        offset: Some(0),
+                        flags: Some(0),
+                        body: Some(body),
+                    }),
+                    payload_header: Some(header.clone()),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+        };
+        self.encrypt_and_send(&data_frame).await?;
+
+        let end_frame = location_nearby_connections::OfflineFrame {
+            version: Some(location_nearby_connections::offline_frame::Version::V1.into()),
+            v1: Some(location_nearby_connections::V1Frame {
+                r#type: Some(location_nearby_connections::v1_frame::FrameType::PayloadTransfer.into()),
+                payload_transfer: Some(PayloadTransferFrame {
+                    packet_type: Some(PacketType::Data.into()),
+                    payload_chunk: Some(PayloadChunk {
+                        offset: Some(total),
+                        flags: Some(1),
+                        body: Some(vec![]),
+                    }),
+                    payload_header: Some(header),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+        };
+        self.encrypt_and_send(&end_frame).await?;
 
         Ok(())
     }

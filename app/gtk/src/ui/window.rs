@@ -1360,6 +1360,42 @@ pub fn apply_custom_css() {
   opacity: 1;
   background: rgba(255,255,255,0.08);
 }
+
+/* ── Send-text pill / chip (in app-window) ──────────────────── */
+.app-window .send-text-pill-btn {
+  border-radius: 999px;
+  padding: 6px 16px;
+  opacity: 0.80;
+  transition: opacity 140ms ease, background 140ms ease;
+}
+.app-window .send-text-pill-btn:hover { opacity: 1; background: rgba(167,165,255,0.10); }
+.app-window .send-text-chip {
+  border-radius: 999px;
+  padding: 0 4px 0 0;
+}
+.app-window .send-text-chip-label {
+  font-size: 0.88em;
+  opacity: 0.88;
+}
+
+/* ── Send-text modal (outside app-window, global scope) ─────── */
+.send-text-modal-wrap {
+  border-radius: 14px;
+  overflow: hidden;
+  margin: 4px 0 2px 0;
+}
+.send-text-modal-wrap scrolledwindow,
+.send-text-modal-wrap scrolledwindow undershoot,
+.send-text-modal-wrap scrolledwindow overshoot {
+  background: transparent;
+}
+textview.send-text-modal-view,
+textview.send-text-modal-view > text {
+  background: transparent;
+  color: inherit;
+  caret-color: #a7a5ff;
+  font-size: 0.97em;
+}
 "#
     .replace("__FONT_SIZE_PX__", &font_size_px.to_string());
 

@@ -76,6 +76,7 @@ pub struct InnerState {
     pub send_hmac_key: Option<Vec<u8>>,
 
     pub text_payload: Option<TextPayloadInfo>,
+    pub text_payload_id: Option<i64>,
     pub payload_buffers: HashMap<i64, Vec<u8>>,
 }
 

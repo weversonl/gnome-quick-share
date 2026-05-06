@@ -1,6 +1,6 @@
 use super::cursor::set_pointer_cursor;
 use crate::tr;
-use gnomeqs_core::{DeviceType, EndpointInfo, EndpointTransport};
+use gnomeqs_core::{DeviceType, EndpointInfo, EndpointTransport, OutboundPayload};
 use gtk4::prelude::*;
 
 pub struct DeviceTile {
@@ -10,8 +10,8 @@ pub struct DeviceTile {
 impl DeviceTile {
     pub fn new(
         endpoint: EndpointInfo,
-        get_files: impl Fn() -> Vec<String> + 'static,
-        handle_send: impl Fn(EndpointInfo, Vec<String>) + 'static,
+        get_payload: impl Fn() -> Option<OutboundPayload> + 'static,
+        handle_send: impl Fn(EndpointInfo, OutboundPayload) + 'static,
     ) -> Self {
         let icon_name = match &endpoint.rtype {
             Some(DeviceType::Phone) => "phone-symbolic",
@@ -112,11 +112,8 @@ impl DeviceTile {
 
         let endpoint_clone = endpoint.clone();
         button.connect_clicked(move |_| {
-            let files = get_files();
-            if files.is_empty() {
-                return;
-            }
-            handle_send(endpoint_clone.clone(), files);
+            let Some(payload) = get_payload() else { return };
+            handle_send(endpoint_clone.clone(), payload);
         });
         Self { button }
     }

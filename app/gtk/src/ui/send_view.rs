@@ -23,6 +23,7 @@ pub struct SendView {
     pub root: gtk4::Box,
     devices_box: gtk4::Box,
     selected_files: Rc<RefCell<Vec<String>>>,
+    selected_text: Rc<RefCell<String>>,
     from_ui_tx: async_channel::Sender<FromUi>,
     devices: Rc<RefCell<HashMap<String, DeviceTile>>>,
     transfers: Rc<RefCell<HashMap<String, TransferRow>>>,
@@ -96,6 +97,7 @@ impl SendView {
         root.append(&content_scroll);
 
         let selected_files: Rc<RefCell<Vec<String>>> = Rc::new(RefCell::new(Vec::new()));
+        let selected_text: Rc<RefCell<String>> = Rc::new(RefCell::new(String::new()));
         let devices: Rc<RefCell<HashMap<String, DeviceTile>>> =
             Rc::new(RefCell::new(HashMap::new()));
         let transfers: Rc<RefCell<HashMap<String, TransferRow>>> =
@@ -192,6 +194,99 @@ impl SendView {
         selected_section.append(&selected_files_header);
         selected_section.append(&selected_files_flow);
         content.append(&selected_section);
+
+        // "Send text" pill button
+        let text_pill_row = gtk4::Box::new(gtk4::Orientation::Horizontal, 0);
+        text_pill_row.set_halign(gtk4::Align::Center);
+        text_pill_row.set_margin_top(2);
+        text_pill_row.set_margin_bottom(4);
+
+        let text_send_btn = gtk4::Button::new();
+        text_send_btn.add_css_class("flat");
+        text_send_btn.add_css_class("send-text-pill-btn");
+        text_send_btn.set_halign(gtk4::Align::Center);
+        set_pointer_cursor(&text_send_btn);
+
+        let text_btn_inner = gtk4::Box::new(gtk4::Orientation::Horizontal, 6);
+        text_btn_inner.set_margin_top(4);
+        text_btn_inner.set_margin_bottom(4);
+        text_btn_inner.set_margin_start(6);
+        text_btn_inner.set_margin_end(6);
+
+        let text_pill_icon = gtk4::Image::from_icon_name("mail-message-new-symbolic");
+        text_pill_icon.set_pixel_size(14);
+        text_pill_icon.set_valign(gtk4::Align::Center);
+
+        let text_pill_label = gtk4::Label::new(Some(&tr!("Send text")));
+        text_pill_label.add_css_class("caption");
+
+        text_btn_inner.append(&text_pill_icon);
+        text_btn_inner.append(&text_pill_label);
+        text_send_btn.set_child(Some(&text_btn_inner));
+        text_pill_row.append(&text_send_btn);
+        content.append(&text_pill_row);
+
+        // Text preview chip — shown after text is confirmed in the modal
+        let text_chip_row = gtk4::Box::new(gtk4::Orientation::Horizontal, 8);
+        text_chip_row.add_css_class("glass-card");
+        text_chip_row.add_css_class("send-text-chip");
+        text_chip_row.set_margin_top(0);
+        text_chip_row.set_margin_bottom(8);
+        text_chip_row.set_margin_start(18);
+        text_chip_row.set_margin_end(18);
+        text_chip_row.set_visible(false);
+
+        let text_chip_icon = gtk4::Image::from_icon_name("mail-message-new-symbolic");
+        text_chip_icon.set_pixel_size(15);
+        text_chip_icon.set_margin_start(12);
+        text_chip_icon.set_margin_top(10);
+        text_chip_icon.set_margin_bottom(10);
+        text_chip_icon.set_valign(gtk4::Align::Center);
+
+        let text_chip_preview = gtk4::Label::new(None);
+        text_chip_preview.add_css_class("send-text-chip-label");
+        text_chip_preview.set_hexpand(true);
+        text_chip_preview.set_halign(gtk4::Align::Start);
+        text_chip_preview.set_ellipsize(gtk4::pango::EllipsizeMode::End);
+        text_chip_preview.set_max_width_chars(40);
+        text_chip_preview.set_margin_top(10);
+        text_chip_preview.set_margin_bottom(10);
+
+        let text_chip_clear = gtk4::Button::from_icon_name("edit-clear-symbolic");
+        text_chip_clear.add_css_class("flat");
+        text_chip_clear.set_valign(gtk4::Align::Center);
+        text_chip_clear.set_margin_end(6);
+        text_chip_clear.set_tooltip_text(Some(&tr!("Clear")));
+        set_pointer_cursor(&text_chip_clear);
+
+        text_chip_row.append(&text_chip_icon);
+        text_chip_row.append(&text_chip_preview);
+        text_chip_row.append(&text_chip_clear);
+        content.append(&text_chip_row);
+
+        {
+            let selected_text_ref = Rc::clone(&selected_text);
+            let chip_row = text_chip_row.clone();
+            text_chip_clear.connect_clicked(move |_| {
+                *selected_text_ref.borrow_mut() = String::new();
+                chip_row.set_visible(false);
+            });
+        }
+        {
+            let selected_text_ref = Rc::clone(&selected_text);
+            let chip_row = text_chip_row.clone();
+            let chip_preview = text_chip_preview.clone();
+            text_send_btn.connect_clicked(move |btn| {
+                let current = selected_text_ref.borrow().clone();
+                open_send_text_dialog(
+                    btn,
+                    &current,
+                    Rc::clone(&selected_text_ref),
+                    chip_row.clone(),
+                    chip_preview.clone(),
+                );
+            });
+        }
 
         let transfer_header = gtk4::Box::new(gtk4::Orientation::Horizontal, 8);
         transfer_header.set_margin_top(2);
@@ -452,6 +547,7 @@ impl SendView {
             root,
             devices_box,
             selected_files,
+            selected_text,
             from_ui_tx,
             devices,
             transfers,
@@ -520,14 +616,32 @@ impl SendView {
         }
 
         let files = Rc::clone(&self.selected_files);
+        let text = Rc::clone(&self.selected_text);
         let tx = self.from_ui_tx.clone();
         let pending_wifi_direct = Rc::clone(&self.pending_wifi_direct_send);
         let sent_requests = Rc::clone(&self.sent_requests);
         let tile = DeviceTile::new(
             info.clone(),
-            move || files.borrow().clone(),
-            move |endpoint, files| match endpoint.transport {
+            move || {
+                let t = text.borrow().clone();
+                if !t.is_empty() {
+                    return Some(OutboundPayload::Text(t));
+                }
+                let f = files.borrow().clone();
+                if !f.is_empty() {
+                    return Some(OutboundPayload::Files(f));
+                }
+                None
+            },
+            move |endpoint, payload| match endpoint.transport {
                 Some(EndpointTransport::WifiDirectPeer) => {
+                    let files = match &payload {
+                        OutboundPayload::Files(f) => f.clone(),
+                        OutboundPayload::Text(_) => {
+                            log::warn!("Wi-Fi Direct text send not supported");
+                            return;
+                        }
+                    };
                     let peer_mac = match endpoint.wifi_direct_peer_mac.clone() {
                         Some(peer_mac) => peer_mac,
                         None => {
@@ -560,7 +674,10 @@ impl SendView {
                     }
                 }
                 _ => {
-                    let retry_files = files.clone();
+                    let retry_files = match &payload {
+                        OutboundPayload::Files(f) => f.clone(),
+                        OutboundPayload::Text(_) => vec![],
+                    };
                     let transfer_id = format!(
                         "{}-{}",
                         endpoint.id,
@@ -578,7 +695,7 @@ impl SendView {
                             endpoint.ip.as_deref().unwrap_or(""),
                             endpoint.port.as_deref().unwrap_or("0")
                         ),
-                        ob: OutboundPayload::Files(files),
+                        ob: payload,
                     };
                     sent_requests.borrow_mut().insert(
                         send_info.id.clone(),
@@ -1445,6 +1562,72 @@ fn file_icon_name(path: &str) -> &'static str {
             | "js" | "ts",
         ) => "text-x-generic-symbolic",
         _ => "text-x-generic-symbolic",
+    }
+}
+
+fn open_send_text_dialog(
+    parent: &impl IsA<gtk4::Widget>,
+    initial_text: &str,
+    selected_text: Rc<RefCell<String>>,
+    chip_row: gtk4::Box,
+    chip_preview: gtk4::Label,
+) {
+    let Some(window) = parent.root().and_downcast::<gtk4::Window>() else {
+        return;
+    };
+
+    let dialog = libadwaita::AlertDialog::new(Some(&tr!("Send text")), None);
+    dialog.add_responses(&[("cancel", &tr!("Cancel")), ("ok", &tr!("OK"))]);
+    dialog.set_default_response(Some("ok"));
+    dialog.set_close_response("cancel");
+    dialog.set_response_appearance("ok", libadwaita::ResponseAppearance::Suggested);
+
+    let text_view = gtk4::TextView::new();
+    text_view.add_css_class("send-text-modal-view");
+    text_view.set_wrap_mode(gtk4::WrapMode::WordChar);
+    text_view.set_left_margin(14);
+    text_view.set_right_margin(14);
+    text_view.set_top_margin(12);
+    text_view.set_bottom_margin(12);
+    text_view.set_pixels_above_lines(2);
+    let text_buffer = text_view.buffer();
+    text_buffer.set_text(initial_text);
+
+    let scroll = gtk4::ScrolledWindow::new();
+    scroll.set_policy(gtk4::PolicyType::Never, gtk4::PolicyType::Automatic);
+    scroll.set_min_content_height(130);
+    scroll.set_max_content_height(260);
+    scroll.set_min_content_width(300);
+    scroll.set_child(Some(&text_view));
+
+    let wrap = gtk4::Box::new(gtk4::Orientation::Vertical, 0);
+    wrap.add_css_class("send-text-modal-wrap");
+    wrap.add_css_class("card");
+    wrap.append(&scroll);
+
+    dialog.set_extra_child(Some(&wrap));
+    dialog.choose(&window, None::<&gio::Cancellable>, move |response| {
+        if response.as_str() == "ok" {
+            let text = text_buffer
+                .text(&text_buffer.start_iter(), &text_buffer.end_iter(), false)
+                .to_string();
+            let trimmed = text.trim().to_string();
+            chip_row.set_visible(!trimmed.is_empty());
+            if !trimmed.is_empty() {
+                chip_preview.set_text(&truncate_send_text_preview(&trimmed, 60));
+            }
+            *selected_text.borrow_mut() = trimmed;
+        }
+    });
+}
+
+fn truncate_send_text_preview(text: &str, max_chars: usize) -> String {
+    let chars: Vec<char> = text.chars().collect();
+    if chars.len() <= max_chars {
+        text.to_string()
+    } else {
+        let truncated: String = chars[..max_chars].iter().collect();
+        format!("{}…", truncated.trim_end())
     }
 }
 
