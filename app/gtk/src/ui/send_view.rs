@@ -420,8 +420,10 @@ impl SendView {
             });
         }
 
-        let drop_target =
-            gtk4::DropTarget::new(gio::File::static_type(), gtk4::gdk::DragAction::COPY);
+        let drop_target = gtk4::DropTarget::new(
+            gtk4::gdk::FileList::static_type(),
+            gtk4::gdk::DragAction::COPY,
+        );
         {
             let selected_files = Rc::clone(&selected_files);
             let files_meta_clone = files_meta.clone();
@@ -432,21 +434,24 @@ impl SendView {
             let selected_section_clone = selected_section.clone();
             drop_target.connect_drop(move |_, value, _, _| {
                 files_group_for_drop.remove_css_class("send-drop-active");
-                if let Ok(file) = value.get::<gio::File>() {
-                    if let Some(path) = file.path() {
-                        let path_str = path.to_string_lossy().into_owned();
-                        if append_selected_paths(&selected_files, vec![path_str]) {
-                            rebuild_selected_files_ui(
-                                &selected_files,
-                                &selected_files_flow_clone,
-                                &files_meta_clone,
-                                &clear_btn_clone,
-                                &upload_icon_clone,
-                                &selected_section_clone,
-                            );
-                        }
-                        return true;
+                if let Ok(file_list) = value.get::<gtk4::gdk::FileList>() {
+                    let paths: Vec<String> = file_list
+                        .files()
+                        .into_iter()
+                        .filter_map(|file| file.path())
+                        .map(|path| path.to_string_lossy().into_owned())
+                        .collect();
+                    if !paths.is_empty() && append_selected_paths(&selected_files, paths) {
+                        rebuild_selected_files_ui(
+                            &selected_files,
+                            &selected_files_flow_clone,
+                            &files_meta_clone,
+                            &clear_btn_clone,
+                            &upload_icon_clone,
+                            &selected_section_clone,
+                        );
                     }
+                    return true;
                 }
                 false
             });
